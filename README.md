@@ -31,15 +31,23 @@ VITE_SUPABASE_URL=https://vrjbksazfwthaeynwkvm.supabase.co
 VITE_SUPABASE_ANON_KEY=<sua publishable key>
 ```
 
-Depois autentique a CLI e aplique a migration:
+Depois aplique a migration no banco remoto. O comando principal nao depende de login interativo da CLI; ele le a senha do Postgres de um arquivo local ignorado pelo Git:
+
+```bash
+cp .env.supabase.example .env.supabase.local
+# preencha SUPABASE_DB_PASSWORD em .env.supabase.local
+npm run supabase:db:push
+```
+
+Se preferir o fluxo linkado da Supabase CLI, use:
 
 ```bash
 npm run supabase:login
 npm run supabase:link
-npm run supabase:db:push
+npm run supabase:db:push:linked
 ```
 
-O `supabase:link` usa o project ref `vrjbksazfwthaeynwkvm`.
+O `supabase:link` usa o project ref `vrjbksazfwthaeynwkvm`, mas em ambiente nao interativo ele exige `SUPABASE_ACCESS_TOKEN`.
 
 ## Cloudflare Pages
 
