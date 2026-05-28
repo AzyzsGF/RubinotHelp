@@ -9,13 +9,10 @@ import {
   Clock3,
   ExternalLink,
   Gavel,
-  Home,
   LogIn,
   LogOut,
   MessageCircle,
-  PackageOpen,
   Pencil,
-  Pickaxe,
   Play,
   Plus,
   Save,
@@ -23,11 +20,9 @@ import {
   Shield,
   Skull,
   Sparkles,
-  ScrollText,
-  Swords,
+  Store,
   TimerReset,
   Trash2,
-  Trophy,
   Upload,
   UserRound,
   X
@@ -97,8 +92,8 @@ type SidebarItem = {
 
 const viewTitles: Record<ViewKey, string> = {
   home: "Início",
-  stamina: "Stamina",
-  bestiary: "Boss Tracker",
+  stamina: "Calculadora de Stamina",
+  bestiary: "BOSS TRACKER",
   cooldowns: "Task Delivery",
   profile: "Perfil",
   admin: "Admin"
@@ -108,31 +103,19 @@ const sidebarSections: Array<{ title: string; items: SidebarItem[] }> = [
   {
     title: "Principal",
     items: [
-      { key: "home", label: "Início", icon: Home },
-      { key: "bestiary", label: "Boss Tracker", icon: Skull, badge: "NEW" },
-      { key: "cooldowns", label: "Task Delivery", icon: ScrollText },
-      { label: "Rubinot Ring", icon: Swords, disabled: true },
-      { label: "Leilões de Personagens", icon: Gavel, disabled: true },
-      { label: "Hall da Fama", icon: Trophy, disabled: true }
+      { key: "bestiary", label: "BOSS TRACKER", icon: Skull },
+      { label: "COMPRAR/VENDER RC", icon: Gavel, disabled: true },
+      { label: "MARKETPLACE", icon: Store, disabled: true }
     ]
   },
   {
     title: "Ferramentas",
     items: [
-      { key: "stamina", label: "Stamina", icon: Clock3 },
-      { label: "Calculadora de Skills", icon: Calculator, disabled: true },
-      { label: "Otimizador de Charms", icon: Sparkles, disabled: true },
-      { label: "Forja de Exaltação", icon: Pickaxe, disabled: true },
-      { label: "Divisor de Loot", icon: PackageOpen, disabled: true },
-      { label: "Cronômetro", icon: AlarmClock, disabled: true }
-    ]
-  },
-  {
-    title: "Comunidade",
-    items: [
-      { label: "Rubinot Wiki", icon: BookOpen, href: "https://rubinot.com.br/news" },
-      { key: "profile", label: "Entre em contato", icon: MessageCircle },
-      { key: "admin", label: "Painel Admin", icon: Shield }
+      { key: "stamina", label: "CALCULADORA DE STAMINA", icon: Clock3 },
+      { label: "CALCULADORA DE SKILLS", icon: Calculator, disabled: true },
+      { label: "OTIMIZADOR DE CHARMS", icon: Sparkles, disabled: true },
+      { key: "bestiary", label: "BESTIARIO TRACKER", icon: BookOpen },
+      { label: "CRONOMETRO", icon: AlarmClock, disabled: true }
     ]
   }
 ];
@@ -173,7 +156,7 @@ function playAlertTone() {
 }
 
 export default function App() {
-  const [view, setView] = useState<ViewKey>("home");
+  const [view, setView] = useState<ViewKey>("bestiary");
   const [user, setUser] = useState<{ id: string; email: string } | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [bosses, setBosses] = useState<BossRecord[]>([]);
@@ -282,7 +265,7 @@ export default function App() {
     setUser(null);
     setProfile(null);
     setCheckins([]);
-    setView("home");
+    setView("bestiary");
     pushToast({ title: "Sessão encerrada", tone: "info" });
   }
 
@@ -336,7 +319,7 @@ export default function App() {
         <aside className="rubinot-sidebar mb-4 lg:sticky lg:top-0 lg:mb-0 lg:flex lg:h-screen lg:w-[360px] lg:flex-col">
           <div className="rubinot-sidebar-logo">
             <span>RUBINOT</span>
-            <span>TOOLS</span>
+            <span>HELP</span>
           </div>
 
           <nav className="rubinot-sidebar-scroll">
@@ -356,11 +339,17 @@ export default function App() {
               </div>
             ) : null}
 
-            <UserStrip userEmail={user?.email} profile={profile} onSignOut={handleSignOut} />
+            <UserStrip
+              onAdminClick={() => setView("admin")}
+              onProfileClick={() => setView("profile")}
+              onSignOut={handleSignOut}
+              profile={profile}
+              userEmail={user?.email}
+            />
           </nav>
 
           <div className="rubinot-sidebar-footer">
-            <span>RUBINOT TOOLS</span>
+            <span>RUBINOT HELP</span>
             <span>V2.1 BETA</span>
           </div>
         </aside>
@@ -523,10 +512,14 @@ function SidebarItemButton({
 }
 
 function UserStrip({
+  onAdminClick,
+  onProfileClick,
   userEmail,
   profile,
   onSignOut
 }: {
+  onAdminClick: () => void;
+  onProfileClick: () => void;
   userEmail?: string;
   profile: Profile | null;
   onSignOut: () => void;
@@ -535,7 +528,11 @@ function UserStrip({
     return (
       <div className="mx-5 mb-5 rounded-md border border-white/10 bg-white/[0.04] p-3 text-sm text-slate-300">
         <p className="font-bold text-slate-100">Visitante</p>
-        <p className="text-xs text-slate-500">Login em Entre em contato.</p>
+        <p className="text-xs text-slate-500">Login, nick e WhatsApp.</p>
+        <button className="mt-3 w-full justify-center btn-primary" onClick={onProfileClick} type="button">
+          <LogIn className="h-4 w-4" />
+          Entrar
+        </button>
       </div>
     );
   }
@@ -549,6 +546,24 @@ function UserStrip({
         <p className="truncate text-sm font-black text-slate-100">{profile?.nick || "Sem nick"}</p>
         <p className="truncate text-xs text-slate-500">{userEmail}</p>
       </div>
+      {profile?.is_admin ? (
+        <button
+          className="flex h-9 w-9 items-center justify-center rounded-md border border-white/10 bg-slate-950 text-slate-300 hover:text-red-400"
+          onClick={onAdminClick}
+          title="Admin"
+          type="button"
+        >
+          <Shield className="h-4 w-4" />
+        </button>
+      ) : null}
+      <button
+        className="flex h-9 w-9 items-center justify-center rounded-md border border-white/10 bg-slate-950 text-slate-300 hover:text-red-400"
+        onClick={onProfileClick}
+        title="Perfil"
+        type="button"
+      >
+        <UserRound className="h-4 w-4" />
+      </button>
       <button
         className="flex h-9 w-9 items-center justify-center rounded-md border border-white/10 bg-slate-950 text-slate-300 hover:text-red-400"
         onClick={onSignOut}
@@ -597,7 +612,7 @@ function HomePanel({
       <div className="rounded-lg p-2 text-parchment md:p-8">
         <div className="max-w-3xl">
           <p className="text-xs font-black uppercase tracking-[0.24em] text-brass drop-shadow">
-            RUBINOT TOOLS
+            RUBINOT HELP
           </p>
           <h3 className="mt-16 max-w-4xl text-5xl font-black leading-[0.98] tracking-normal drop-shadow-[0_5px_20px_rgba(0,0,0,0.65)] md:text-7xl">
             Painel de caça, stamina e boss tracker.
