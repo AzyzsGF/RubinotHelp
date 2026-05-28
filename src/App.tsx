@@ -593,19 +593,16 @@ function HomePanel({
   const readyCooldowns = checkins.length - activeCooldowns;
 
   return (
-    <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
-      <div
-        className="overflow-hidden rounded-lg border border-ink/10 bg-cover bg-center shadow-panel"
-        style={{
-          backgroundImage: `linear-gradient(90deg, rgba(16,23,19,.96), rgba(16,23,19,.74), rgba(16,23,19,.28)), url(${HERO_IMAGE})`
-        }}
-      >
-        <div className="min-h-[360px] max-w-3xl p-6 text-parchment md:p-8">
-          <p className="text-xs font-black uppercase tracking-[0.2em] text-brass">RUBINOT TOOLS</p>
-          <h3 className="mt-16 max-w-xl text-4xl font-black tracking-normal md:text-5xl">
+    <section className="grid min-h-[calc(100vh-7.5rem)] items-center gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
+      <div className="rounded-lg p-2 text-parchment md:p-8">
+        <div className="max-w-3xl">
+          <p className="text-xs font-black uppercase tracking-[0.24em] text-brass drop-shadow">
+            RUBINOT TOOLS
+          </p>
+          <h3 className="mt-16 max-w-4xl text-5xl font-black leading-[0.98] tracking-normal drop-shadow-[0_5px_20px_rgba(0,0,0,0.65)] md:text-7xl">
             Painel de caça, stamina e boss tracker.
           </h3>
-          <div className="mt-6 flex flex-wrap gap-2">
+          <div className="mt-7 flex flex-wrap gap-3">
             <button className="btn-primary" onClick={() => onNavigate("bestiary")} type="button">
               <Skull className="h-4 w-4" />
               Boss Tracker
