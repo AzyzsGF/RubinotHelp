@@ -1,21 +1,33 @@
 import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import {
   Activity,
+  AlarmClock,
   Bell,
   BookOpen,
+  Calculator,
   CheckCircle2,
   Clock3,
+  ExternalLink,
+  Gavel,
+  Home,
   LogIn,
   LogOut,
   MessageCircle,
+  PackageOpen,
   Pencil,
+  Pickaxe,
   Play,
   Plus,
   Save,
   Search,
   Shield,
+  Skull,
+  Sparkles,
+  ScrollText,
+  Swords,
   TimerReset,
   Trash2,
+  Trophy,
   Upload,
   UserRound,
   X
@@ -74,12 +86,55 @@ const emptyBossDraft: BossDraft = {
   is_active: true
 };
 
-const navigation: Array<{ key: ViewKey; label: string; icon: typeof Activity }> = [
-  { key: "stamina", label: "Stamina", icon: Activity },
-  { key: "bestiary", label: "Bestiário", icon: BookOpen },
-  { key: "cooldowns", label: "Cooldowns", icon: Bell },
-  { key: "profile", label: "Perfil", icon: UserRound },
-  { key: "admin", label: "Admin", icon: Shield }
+type SidebarItem = {
+  key?: ViewKey;
+  label: string;
+  icon: typeof Activity;
+  badge?: string;
+  href?: string;
+  disabled?: boolean;
+};
+
+const viewTitles: Record<ViewKey, string> = {
+  home: "Início",
+  stamina: "Stamina",
+  bestiary: "Boss Tracker",
+  cooldowns: "Task Delivery",
+  profile: "Perfil",
+  admin: "Admin"
+};
+
+const sidebarSections: Array<{ title: string; items: SidebarItem[] }> = [
+  {
+    title: "Principal",
+    items: [
+      { key: "home", label: "Início", icon: Home },
+      { key: "bestiary", label: "Boss Tracker", icon: Skull, badge: "NEW" },
+      { key: "cooldowns", label: "Task Delivery", icon: ScrollText },
+      { label: "Rubinot Ring", icon: Swords, disabled: true },
+      { label: "Leilões de Personagens", icon: Gavel, disabled: true },
+      { label: "Hall da Fama", icon: Trophy, disabled: true }
+    ]
+  },
+  {
+    title: "Ferramentas",
+    items: [
+      { key: "stamina", label: "Stamina", icon: Clock3 },
+      { label: "Calculadora de Skills", icon: Calculator, disabled: true },
+      { label: "Otimizador de Charms", icon: Sparkles, disabled: true },
+      { label: "Forja de Exaltação", icon: Pickaxe, disabled: true },
+      { label: "Divisor de Loot", icon: PackageOpen, disabled: true },
+      { label: "Cronômetro", icon: AlarmClock, disabled: true }
+    ]
+  },
+  {
+    title: "Comunidade",
+    items: [
+      { label: "Rubinot Wiki", icon: BookOpen, href: "https://rubinot.com.br/news" },
+      { key: "profile", label: "Entre em contato", icon: MessageCircle },
+      { key: "admin", label: "Painel Admin", icon: Shield }
+    ]
+  }
 ];
 
 function splitTags(value: string) {
@@ -118,7 +173,7 @@ function playAlertTone() {
 }
 
 export default function App() {
-  const [view, setView] = useState<ViewKey>("stamina");
+  const [view, setView] = useState<ViewKey>("home");
   const [user, setUser] = useState<{ id: string; email: string } | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [bosses, setBosses] = useState<BossRecord[]>([]);
@@ -227,7 +282,7 @@ export default function App() {
     setUser(null);
     setProfile(null);
     setCheckins([]);
-    setView("stamina");
+    setView("home");
     pushToast({ title: "Sessão encerrada", tone: "info" });
   }
 
@@ -277,49 +332,45 @@ export default function App() {
 
   return (
     <div className="app-bg min-h-screen">
-      <div className="mx-auto flex min-h-screen w-full max-w-[1500px] flex-col px-4 py-4 lg:flex-row lg:gap-4 lg:px-6">
-        <aside className="panel mb-4 rounded-lg p-3 lg:sticky lg:top-4 lg:mb-0 lg:flex lg:h-[calc(100vh-2rem)] lg:w-72 lg:flex-col">
-          <div
-            className="mb-3 rounded-lg bg-cover bg-center p-4 text-parchment"
-            style={{ backgroundImage: `linear-gradient(90deg, rgba(16,23,19,.92), rgba(16,23,19,.35)), url(${HERO_IMAGE})` }}
-          >
-            <p className="text-xs uppercase tracking-[0.18em] text-brass">Rubinot Help</p>
-            <h1 className="mt-10 text-3xl font-black tracking-normal">Rubinot Help</h1>
-            <p className="mt-2 max-w-52 text-sm text-parchment/85">
-              Stamina, bestiário e cooldowns em um painel.
-            </p>
+      <div className="flex min-h-screen w-full flex-col lg:flex-row">
+        <aside className="rubinot-sidebar mb-4 lg:sticky lg:top-0 lg:mb-0 lg:flex lg:h-screen lg:w-[360px] lg:flex-col">
+          <div className="rubinot-sidebar-logo">
+            <span>RUBINOT</span>
+            <span>TOOLS</span>
           </div>
 
-          <nav className="grid grid-cols-2 gap-2 lg:grid-cols-1">
-            {navigation.map((item) => (
-              <NavButton
-                key={item.key}
-                active={view === item.key}
-                icon={item.icon}
-                label={item.label}
-                locked={item.key === "admin" && !profile?.is_admin}
-                onClick={() => setView(item.key)}
+          <nav className="rubinot-sidebar-scroll">
+            {sidebarSections.map((section) => (
+              <SidebarSection
+                activeView={view}
+                isAdmin={Boolean(profile?.is_admin)}
+                key={section.title}
+                onNavigate={setView}
+                section={section}
               />
             ))}
-          </nav>
 
-          <div className="mt-3 lg:mt-auto">
             {usingDemoBackend ? (
-              <div className="mb-3 rounded-lg border border-ember/30 bg-ember/10 px-3 py-2 text-xs text-ink">
+              <div className="mx-5 mb-5 rounded-md border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs font-bold text-amber-300">
                 Modo local ativo. Configure Supabase para produção.
               </div>
             ) : null}
 
             <UserStrip userEmail={user?.email} profile={profile} onSignOut={handleSignOut} />
+          </nav>
+
+          <div className="rubinot-sidebar-footer">
+            <span>RUBINOT TOOLS</span>
+            <span>V2.1 BETA</span>
           </div>
         </aside>
 
-        <main className="min-w-0 flex-1">
+        <main className="min-w-0 flex-1 px-4 py-4 lg:px-6">
           <div className="mb-4 flex flex-col gap-3 rounded-lg border border-ink/10 bg-ink px-4 py-3 text-parchment shadow-panel md:flex-row md:items-center md:justify-between">
             <div>
               <p className="text-xs uppercase tracking-[0.18em] text-brass">Servidor RubinOT</p>
               <h2 className="text-xl font-black tracking-normal md:text-2xl">
-                {navigation.find((item) => item.key === view)?.label}
+                {viewTitles[view]}
               </h2>
             </div>
             <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -335,6 +386,14 @@ export default function App() {
             </div>
           ) : (
             <>
+              {view === "home" ? (
+                <HomePanel
+                  bosses={bosses}
+                  checkins={checkins}
+                  onNavigate={setView}
+                  userSignedIn={Boolean(user)}
+                />
+              ) : null}
               {view === "stamina" ? <StaminaPanel /> : null}
               {view === "bestiary" ? (
                 <BestiaryPanel bosses={bosses} userSignedIn={Boolean(user)} onCheckIn={handleCheckIn} />
@@ -373,32 +432,92 @@ export default function App() {
   );
 }
 
-function NavButton({
-  active,
-  icon: Icon,
-  label,
-  locked,
-  onClick
+function SidebarSection({
+  activeView,
+  isAdmin,
+  onNavigate,
+  section
 }: {
-  active: boolean;
-  icon: typeof Activity;
-  label: string;
-  locked?: boolean;
-  onClick: () => void;
+  activeView: ViewKey;
+  isAdmin: boolean;
+  onNavigate: (view: ViewKey) => void;
+  section: { title: string; items: SidebarItem[] };
 }) {
   return (
+    <div className="rubinot-sidebar-section">
+      <div className="rubinot-sidebar-section-title">
+        <span />
+        <strong>{section.title}</strong>
+        <span />
+      </div>
+
+      <div className="space-y-1">
+        {section.items.map((item) => {
+          const locked = item.key === "admin" && !isAdmin;
+          return (
+            <SidebarItemButton
+              active={Boolean(item.key && activeView === item.key)}
+              item={item}
+              key={`${section.title}-${item.label}`}
+              locked={locked}
+              onNavigate={onNavigate}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function SidebarItemButton({
+  active,
+  item,
+  locked,
+  onNavigate
+}: {
+  active: boolean;
+  item: SidebarItem;
+  locked: boolean;
+  onNavigate: (view: ViewKey) => void;
+}) {
+  const Icon = item.icon;
+  const className = clsx(
+    "rubinot-sidebar-link",
+    active && "rubinot-sidebar-link-active",
+    (item.disabled || locked) && "rubinot-sidebar-link-muted"
+  );
+
+  const content = (
+    <>
+      <Icon className="h-5 w-5 shrink-0" />
+      <span className="min-w-0 flex-1 truncate">{item.label}</span>
+      {item.badge ? <span className="rubinot-sidebar-badge">{item.badge}</span> : null}
+      {item.href ? <ExternalLink className="h-4 w-4 shrink-0 opacity-70" /> : null}
+      {locked ? <Shield className="h-4 w-4 shrink-0 opacity-70" /> : null}
+    </>
+  );
+
+  if (item.href) {
+    return (
+      <a className={className} href={item.href} rel="noreferrer" target="_blank">
+        {content}
+      </a>
+    );
+  }
+
+  return (
     <button
-      className={clsx(
-        "flex h-11 items-center gap-3 rounded-lg px-3 text-left text-sm font-bold transition",
-        active ? "bg-pine text-parchment" : "bg-white/70 text-ink hover:bg-white"
-      )}
-      onClick={onClick}
+      className={className}
+      disabled={item.disabled}
+      onClick={() => {
+        if (item.key) {
+          onNavigate(item.key);
+        }
+      }}
+      title={item.disabled ? "Em breve" : item.label}
       type="button"
-      title={label}
     >
-      <Icon className="h-4 w-4 shrink-0" />
-      <span className="min-w-0 truncate">{label}</span>
-      {locked ? <Shield className="ml-auto h-3.5 w-3.5 opacity-60" /> : null}
+      {content}
     </button>
   );
 }
@@ -414,24 +533,24 @@ function UserStrip({
 }) {
   if (!userEmail) {
     return (
-      <div className="rounded-lg bg-white/70 p-3 text-sm text-ink">
-        <p className="font-bold">Visitante</p>
-        <p className="text-xs text-ink/65">Login em Perfil.</p>
+      <div className="mx-5 mb-5 rounded-md border border-white/10 bg-white/[0.04] p-3 text-sm text-slate-300">
+        <p className="font-bold text-slate-100">Visitante</p>
+        <p className="text-xs text-slate-500">Login em Entre em contato.</p>
       </div>
     );
   }
 
   return (
-    <div className="flex items-center gap-3 rounded-lg bg-white/70 p-3">
-      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-pine text-parchment">
+    <div className="mx-5 mb-5 flex items-center gap-3 rounded-md border border-white/10 bg-white/[0.04] p-3">
+      <div className="flex h-10 w-10 items-center justify-center rounded-md bg-amber-500 text-slate-950">
         <UserRound className="h-5 w-5" />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-black text-ink">{profile?.nick || "Sem nick"}</p>
-        <p className="truncate text-xs text-ink/65">{userEmail}</p>
+        <p className="truncate text-sm font-black text-slate-100">{profile?.nick || "Sem nick"}</p>
+        <p className="truncate text-xs text-slate-500">{userEmail}</p>
       </div>
       <button
-        className="flex h-9 w-9 items-center justify-center rounded-lg bg-ink text-parchment hover:bg-pine"
+        className="flex h-9 w-9 items-center justify-center rounded-md border border-white/10 bg-slate-950 text-slate-300 hover:text-amber-400"
         onClick={onSignOut}
         title="Sair"
         type="button"
@@ -454,6 +573,76 @@ function Badge({ children, tone }: { children: string; tone: "green" | "amber" |
     >
       {children}
     </span>
+  );
+}
+
+function HomePanel({
+  bosses,
+  checkins,
+  onNavigate,
+  userSignedIn
+}: {
+  bosses: BossRecord[];
+  checkins: BossCheckin[];
+  onNavigate: (view: ViewKey) => void;
+  userSignedIn: boolean;
+}) {
+  const activeCooldowns = checkins.filter(
+    (checkin) => new Date(checkin.cooldown_ends_at).getTime() > Date.now()
+  ).length;
+  const readyCooldowns = checkins.length - activeCooldowns;
+
+  return (
+    <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
+      <div
+        className="overflow-hidden rounded-lg border border-ink/10 bg-cover bg-center shadow-panel"
+        style={{
+          backgroundImage: `linear-gradient(90deg, rgba(16,23,19,.96), rgba(16,23,19,.74), rgba(16,23,19,.28)), url(${HERO_IMAGE})`
+        }}
+      >
+        <div className="min-h-[360px] max-w-3xl p-6 text-parchment md:p-8">
+          <p className="text-xs font-black uppercase tracking-[0.2em] text-brass">RUBINOT TOOLS</p>
+          <h3 className="mt-16 max-w-xl text-4xl font-black tracking-normal md:text-5xl">
+            Painel de caça, stamina e boss tracker.
+          </h3>
+          <div className="mt-6 flex flex-wrap gap-2">
+            <button className="btn-primary" onClick={() => onNavigate("bestiary")} type="button">
+              <Skull className="h-4 w-4" />
+              Boss Tracker
+            </button>
+            <button className="btn-secondary" onClick={() => onNavigate("stamina")} type="button">
+              <Clock3 className="h-4 w-4" />
+              Stamina
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="panel rounded-lg p-5">
+        <h3 className="text-lg font-black text-ink">Resumo</h3>
+        <div className="mt-4 grid gap-3">
+          <Metric label="Bosses ativos" value={bosses.length.toString()} />
+          <Metric label="Cooldowns ativos" value={userSignedIn ? activeCooldowns.toString() : "Login"} />
+          <Metric label="Prontos" value={userSignedIn ? readyCooldowns.toString() : "0"} />
+        </div>
+        <div className="mt-4 grid gap-2">
+          <button className="btn-secondary justify-between" onClick={() => onNavigate("cooldowns")} type="button">
+            <span className="inline-flex items-center gap-2">
+              <Bell className="h-4 w-4" />
+              Meus cooldowns
+            </span>
+            <span>{activeCooldowns}</span>
+          </button>
+          <button className="btn-secondary justify-between" onClick={() => onNavigate("profile")} type="button">
+            <span className="inline-flex items-center gap-2">
+              <UserRound className="h-4 w-4" />
+              Perfil e WhatsApp
+            </span>
+            <span>{userSignedIn ? "OK" : "Entrar"}</span>
+          </button>
+        </div>
+      </div>
+    </section>
   );
 }
 
