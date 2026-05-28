@@ -1,0 +1,96 @@
+# Rubinot Help
+
+Painel de utilidades para jogadores do RubinOT com calculadora de stamina, bestiário, check-ins de bosses e alertas por navegador/WhatsApp.
+
+## Stack
+
+- Vite + React + TypeScript + Tailwind
+- Supabase Auth, Postgres e Storage
+- Cloudflare Pages para o site
+- Cloudflare Worker com cron para Evolution API
+
+## Rodar local
+
+```bash
+npm install
+npm run dev
+```
+
+Sem `.env.local`, o app usa um backend local em `localStorage`. A primeira conta criada nesse modo vira admin para facilitar testes.
+
+Para usar Supabase:
+
+```bash
+cp .env.example .env.local
+```
+
+Este workspace ja tem um `.env.local` ignorado pelo git apontando para o projeto:
+
+```text
+VITE_SUPABASE_URL=https://vrjbksazfwthaeynwkvm.supabase.co
+VITE_SUPABASE_ANON_KEY=<sua publishable key>
+```
+
+Depois autentique a CLI e aplique a migration:
+
+```bash
+npm run supabase:login
+npm run supabase:link
+npm run supabase:db:push
+```
+
+O `supabase:link` usa o project ref `vrjbksazfwthaeynwkvm`.
+
+## Cloudflare Pages
+
+Configure o projeto Pages com:
+
+- Build command: `npm run build`
+- Build output: `dist`
+- Environment variables:
+  - `VITE_SUPABASE_URL=https://vrjbksazfwthaeynwkvm.supabase.co`
+  - `VITE_SUPABASE_ANON_KEY=<sua publishable key>`
+
+## Worker de WhatsApp
+
+Copie `worker/.dev.vars.example` para `worker/.dev.vars` durante desenvolvimento e preencha:
+
+```text
+SUPABASE_URL=
+SUPABASE_SERVICE_ROLE_KEY=
+EVOLUTION_BASE_URL=
+EVOLUTION_API_KEY=
+EVOLUTION_INSTANCE=
+CRON_SECRET=
+```
+
+Comandos:
+
+```bash
+npm run worker:dev
+npm run worker:deploy
+```
+
+O Worker roda a cada minuto e processa `notification_jobs` pendentes. Ele envia mensagens via `POST /message/sendText/{instance}` da Evolution API.
+
+## Admin
+
+1. Crie sua conta pelo site.
+2. No Supabase SQL editor:
+
+```sql
+update public.profiles
+set is_admin = true
+where email = 'seu-email@exemplo.com';
+```
+
+3. Recarregue o site e acesse `Admin`.
+
+## Testes
+
+```bash
+npm test
+npm run build
+```
+
+As regras de stamina implementadas seguem a página pública de Server Info do RubinOT: faixas de bonus/normal/reduzida, sem loot abaixo de 08:00, e regeneração orange/green por offline/sleeping, trainer e protection zone.
