@@ -41,8 +41,18 @@ textarea:focus-visible {
     radial-gradient(circle at 78% 18%, rgba(255, 59, 33, 0.22), transparent 28rem),
     linear-gradient(90deg, rgba(4, 9, 8, 0.94) 0%, rgba(7, 12, 12, 0.72) 42%, rgba(25, 8, 4, 0.42) 100%),
     linear-gradient(180deg, rgba(4, 9, 8, 0.5) 0%, rgba(5, 10, 9, 0.68) 46%, rgba(6, 10, 10, 0.86) 100%),
-    url("/rubinot-cave-banner.jpg") center center / cover fixed no-repeat,
+    url("/rubinot-cave-background.jpg") center center / cover fixed no-repeat,
     #080c0b;
+}
+
+.site-topbar {
+  border: 1px solid rgba(255, 59, 33, 0.34);
+  background:
+    radial-gradient(circle at 92% 14%, rgba(255, 59, 33, 0.25), transparent 18rem),
+    linear-gradient(90deg, rgba(11, 10, 14, 0.98), rgba(30, 12, 14, 0.96) 58%, rgba(74, 15, 12, 0.92));
+  box-shadow:
+    0 18px 48px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .panel {

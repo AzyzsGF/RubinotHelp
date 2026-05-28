@@ -355,7 +355,7 @@ export default function App() {
         </aside>
 
         <main className="min-w-0 flex-1 px-4 py-4 lg:px-6">
-          <div className="mb-4 flex flex-col gap-3 rounded-lg border border-ink/10 bg-ink px-4 py-3 text-parchment shadow-panel md:flex-row md:items-center md:justify-between">
+          <div className="site-topbar mb-4 flex flex-col gap-3 rounded-lg px-4 py-3 text-parchment shadow-panel md:flex-row md:items-center md:justify-between">
             <div>
               <p className="text-xs uppercase tracking-[0.18em] text-brass">Servidor RubinOT</p>
               <h2 className="text-xl font-black tracking-normal md:text-2xl">
@@ -363,7 +363,7 @@ export default function App() {
               </h2>
             </div>
             <div className="flex flex-wrap items-center gap-2 text-sm">
-              <Badge tone="green">Bestiary 2x</Badge>
+              <Badge tone="fire">Bestiary 2x</Badge>
               <Badge tone="fire">Loot 2.5x</Badge>
               <Badge tone="stone">Save 10:00 UTC-3</Badge>
             </div>
