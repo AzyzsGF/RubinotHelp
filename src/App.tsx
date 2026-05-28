@@ -7,11 +7,13 @@ import {
   Calculator,
   CheckCircle2,
   Clock3,
+  Dumbbell,
   ExternalLink,
   Gavel,
   LogIn,
   LogOut,
   MessageCircle,
+  Moon,
   Pencil,
   Play,
   Plus,
@@ -58,6 +60,10 @@ import {
   calculateStaminaProjection,
   formatStamina,
   getStaminaBand,
+  GREEN_STAMINA_START,
+  MAX_STAMINA_MINUTES,
+  NO_LOOT_START,
+  NORMAL_STAMINA_START,
   REGEN_RATES,
   RegenMode,
   STAMINA_TARGETS,
@@ -120,6 +126,12 @@ const sidebarSections: Array<{ title: string; items: SidebarItem[] }> = [
       { label: "CRONOMETRO", icon: AlarmClock, disabled: true }
     ]
   }
+];
+
+const regenCards: Array<{ mode: RegenMode; icon: typeof Activity }> = [
+  { mode: "offline", icon: Moon },
+  { mode: "trainer", icon: Dumbbell },
+  { mode: "protection", icon: Shield }
 ];
 
 function splitTags(value: string) {
@@ -660,20 +672,66 @@ function HomePanel({
   );
 }
 
+function getStaminaBarColor(totalMinutes: number) {
+  if (totalMinutes >= GREEN_STAMINA_START) {
+    return "#22c55e";
+  }
+
+  if (totalMinutes >= NORMAL_STAMINA_START) {
+    return "#f59e0b";
+  }
+
+  if (totalMinutes >= NO_LOOT_START) {
+    return "#ef4444";
+  }
+
+  return "#7f1d1d";
+}
+
 function StaminaPanel() {
   const [hours, setHours] = useState(38);
   const [minutes, setMinutes] = useState(59);
   const [target, setTarget] = useState<StaminaTarget>("full");
-  const [mode, setMode] = useState<RegenMode>("offline");
 
   const currentMinutes = toStaminaMinutes(hours, minutes);
-  const projection = calculateStaminaProjection(currentMinutes, target, mode);
+  const projections = regenCards.map(({ mode, icon }) => ({
+    icon,
+    mode,
+    rate: REGEN_RATES[mode],
+    projection: calculateStaminaProjection(currentMinutes, target, mode)
+  }));
+  const targetMinutes = projections[0]?.projection.target ?? currentMinutes;
   const band = getStaminaBand(currentMinutes);
+  const staminaPercent = Math.min(100, Math.max(0, (currentMinutes / MAX_STAMINA_MINUTES) * 100));
+  const barColor = getStaminaBarColor(currentMinutes);
 
   return (
     <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
       <div className="panel rounded-lg p-5">
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="rounded-lg border border-slate-800/20 bg-[#111722] p-4 text-slate-100 shadow-inner">
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <span className="text-sm font-black text-slate-400">Stamina Bar</span>
+            <span className="font-black">{formatStamina(currentMinutes)}</span>
+          </div>
+          <div className="h-3 overflow-hidden rounded-full border border-black/50 bg-black/45">
+            <div
+              className="h-full rounded-full transition-all"
+              style={{
+                width: `${staminaPercent}%`,
+                backgroundColor: barColor,
+                boxShadow: `0 0 18px ${barColor}`
+              }}
+            />
+          </div>
+          <div className="mt-2 grid grid-cols-4 text-[11px] font-black uppercase tracking-[0.08em] text-slate-500">
+            <span>0:00</span>
+            <span className="text-center">8:00</span>
+            <span className="text-center">14:00</span>
+            <span className="text-right">42:00</span>
+          </div>
+        </div>
+
+        <div className="mt-5 grid gap-4 md:grid-cols-3">
           <Field label="Horas">
             <input
               className="input"
@@ -707,34 +765,45 @@ function StaminaPanel() {
               ))}
             </select>
           </Field>
-          <Field label="Regeneração">
-            <select
-              className="input"
-              onChange={(event) => setMode(event.target.value as RegenMode)}
-              value={mode}
-            >
-              {Object.entries(REGEN_RATES).map(([key, item]) => (
-                <option key={key} value={key}>
-                  {item.label}
-                </option>
-              ))}
-            </select>
-          </Field>
         </div>
 
-        <div className="mt-5 grid gap-3 md:grid-cols-4">
+        <div className="mt-5 grid gap-3 md:grid-cols-3">
           <Metric label="Atual" value={formatStamina(currentMinutes)} />
           <Metric label="Faixa" value={band.label} />
-          <Metric label="Tempo real" value={formatDuration(projection.recoveryMinutes)} />
-          <Metric label="Pronto" value={formatDateTime(projection.readyAt)} />
+          <Metric label="Meta" value={formatStamina(targetMinutes)} />
         </div>
 
-        <div className="mt-5 rounded-lg border border-ink/10 bg-mist p-4">
+        <div className="mt-5 rounded-lg border border-red-500/20 bg-red-50/80 p-4">
           <p className="text-sm font-black text-ink">{band.effect}</p>
           <p className="mt-1 text-sm text-ink/70">
-            De {formatStamina(currentMinutes)} para {formatStamina(projection.target)} usando{" "}
-            {REGEN_RATES[mode].label.toLowerCase()}.
+            De {formatStamina(currentMinutes)} para {formatStamina(targetMinutes)}. Veja abaixo o
+            tempo nas três formas de regeneração.
           </p>
+        </div>
+
+        <div className="mt-5 grid gap-3 md:grid-cols-3 xl:grid-cols-1 2xl:grid-cols-3">
+          {projections.map(({ icon: Icon, mode, projection, rate }) => (
+            <div
+              className="rounded-lg border border-red-500/18 bg-white/80 p-4 shadow-sm"
+              key={mode}
+            >
+              <div className="mb-3 flex items-center gap-3">
+                <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-600 text-white shadow-[0_0_20px_rgba(220,38,38,0.28)]">
+                  <Icon className="h-5 w-5" />
+                </span>
+                <div className="min-w-0">
+                  <p className="truncate font-black text-ink">{rate.label}</p>
+                  <p className="text-xs font-bold text-ink/55">
+                    Orange {rate.orangeMinutesPerStamina}min · Green {rate.greenMinutesPerStamina}min
+                  </p>
+                </div>
+              </div>
+              <Metric label="Tempo real" value={formatDuration(projection.recoveryMinutes)} compact />
+              <div className="mt-2">
+                <Metric label="Pronto" value={formatDateTime(projection.readyAt)} compact />
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -748,7 +817,7 @@ function StaminaPanel() {
         </div>
         <div className="mt-5 overflow-hidden rounded-lg border border-ink/10">
           <table className="w-full text-left text-sm">
-            <thead className="bg-pine text-parchment">
+            <thead className="bg-red-950 text-parchment">
               <tr>
                 <th className="px-3 py-2">Condição</th>
                 <th className="px-3 py-2">Orange</th>

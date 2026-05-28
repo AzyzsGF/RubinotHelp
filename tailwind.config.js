@@ -5,8 +5,8 @@ export default {
     extend: {
       colors: {
         coal: "#101713",
-        pine: "#173527",
-        moss: "#6f8e4f",
+        pine: "#3f0b0b",
+        moss: "#ef4444",
         ember: "#dc2626",
         brass: "#ff3b21",
         mist: "#edf1ea",

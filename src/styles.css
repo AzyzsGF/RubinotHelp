@@ -199,11 +199,11 @@ textarea:focus-visible {
 }
 
 .rubinot-sidebar-badge {
-  border: 1px solid rgba(16, 185, 129, 0.34);
+  border: 1px solid rgba(255, 59, 33, 0.38);
   border-radius: 5px;
-  background: rgba(6, 95, 70, 0.55);
+  background: rgba(127, 29, 29, 0.62);
   padding: 4px 8px;
-  color: #6ee7b7;
+  color: #fecaca;
   font-size: 0.67rem;
   font-weight: 900;
   letter-spacing: 0.04em;
