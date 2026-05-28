@@ -351,7 +351,7 @@ export default function App() {
             ))}
 
             {usingDemoBackend ? (
-              <div className="mx-5 mb-5 rounded-md border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs font-bold text-amber-300">
+              <div className="mx-5 mb-5 rounded-md border border-red-500/25 bg-red-500/10 px-3 py-2 text-xs font-bold text-red-300">
                 Modo local ativo. Configure Supabase para produção.
               </div>
             ) : null}
@@ -375,7 +375,7 @@ export default function App() {
             </div>
             <div className="flex flex-wrap items-center gap-2 text-sm">
               <Badge tone="green">Bestiary 2x</Badge>
-              <Badge tone="amber">Loot 2.5x</Badge>
+              <Badge tone="fire">Loot 2.5x</Badge>
               <Badge tone="stone">Save 10:00 UTC-3</Badge>
             </div>
           </div>
@@ -542,7 +542,7 @@ function UserStrip({
 
   return (
     <div className="mx-5 mb-5 flex items-center gap-3 rounded-md border border-white/10 bg-white/[0.04] p-3">
-      <div className="flex h-10 w-10 items-center justify-center rounded-md bg-amber-500 text-slate-950">
+      <div className="flex h-10 w-10 items-center justify-center rounded-md bg-red-500 text-white">
         <UserRound className="h-5 w-5" />
       </div>
       <div className="min-w-0 flex-1">
@@ -550,7 +550,7 @@ function UserStrip({
         <p className="truncate text-xs text-slate-500">{userEmail}</p>
       </div>
       <button
-        className="flex h-9 w-9 items-center justify-center rounded-md border border-white/10 bg-slate-950 text-slate-300 hover:text-amber-400"
+        className="flex h-9 w-9 items-center justify-center rounded-md border border-white/10 bg-slate-950 text-slate-300 hover:text-red-400"
         onClick={onSignOut}
         title="Sair"
         type="button"
@@ -561,13 +561,13 @@ function UserStrip({
   );
 }
 
-function Badge({ children, tone }: { children: string; tone: "green" | "amber" | "stone" }) {
+function Badge({ children, tone }: { children: string; tone: "green" | "fire" | "stone" }) {
   return (
     <span
       className={clsx(
         "rounded-full border px-3 py-1 text-xs font-black",
         tone === "green" && "border-moss/40 bg-moss/20 text-mist",
-        tone === "amber" && "border-brass/40 bg-brass/20 text-parchment",
+        tone === "fire" && "border-brass/40 bg-brass/20 text-parchment",
         tone === "stone" && "border-parchment/20 bg-parchment/10 text-parchment"
       )}
     >

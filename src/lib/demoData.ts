@@ -1,7 +1,7 @@
 import { BossRecord } from "../types";
 import { createId, nowIso } from "./time";
 
-export const HERO_IMAGE = "/rubinot-hero.png";
+export const HERO_IMAGE = "/rubinot-cave-banner.jpg";
 
 export function createDemoBosses(): BossRecord[] {
   const created = nowIso();

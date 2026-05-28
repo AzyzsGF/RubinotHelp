@@ -7,8 +7,8 @@ export default {
         coal: "#101713",
         pine: "#173527",
         moss: "#6f8e4f",
-        ember: "#c96f3a",
-        brass: "#c9a24f",
+        ember: "#dc2626",
+        brass: "#ff3b21",
         mist: "#edf1ea",
         parchment: "#f4efe4",
         ink: "#18211b"
