@@ -108,7 +108,10 @@ security definer
 set search_path = public
 as $$
 begin
-  if old.is_admin is distinct from new.is_admin and not public.current_user_is_admin() then
+  if auth.uid() is not null
+    and old.is_admin is distinct from new.is_admin
+    and not public.current_user_is_admin()
+  then
     raise exception 'Only an admin can change is_admin';
   end if;
 
@@ -128,11 +131,12 @@ security definer
 set search_path = public
 as $$
 begin
-  insert into public.profiles (id, email, nick)
+  insert into public.profiles (id, email, nick, is_admin)
   values (
     new.id,
     coalesce(new.email, ''),
-    coalesce(new.raw_user_meta_data->>'nick', '')
+    coalesce(new.raw_user_meta_data->>'nick', ''),
+    lower(coalesce(new.email, '')) = 'gabrielfroesguimaraes@gmail.com'
   )
   on conflict (id) do nothing;
 
@@ -144,6 +148,20 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
 after insert on auth.users
 for each row execute function public.handle_new_user();
+
+insert into public.profiles (id, email, nick, is_admin)
+select
+  users.id,
+  coalesce(users.email, ''),
+  coalesce(users.raw_user_meta_data->>'nick', 'Gabriel'),
+  true
+from auth.users
+where lower(coalesce(users.email, '')) = 'gabrielfroesguimaraes@gmail.com'
+on conflict (id) do update
+set
+  email = excluded.email,
+  is_admin = true,
+  updated_at = now();
 
 alter table public.profiles enable row level security;
 alter table public.bosses enable row level security;

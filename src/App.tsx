@@ -21,6 +21,7 @@ import {
   Skull,
   Sparkles,
   Store,
+  Swords,
   TimerReset,
   Trash2,
   Upload,
@@ -105,7 +106,8 @@ const sidebarSections: Array<{ title: string; items: SidebarItem[] }> = [
     items: [
       { key: "bestiary", label: "BOSS TRACKER", icon: Skull },
       { label: "COMPRAR/VENDER RC", icon: Gavel, disabled: true },
-      { label: "MARKETPLACE", icon: Store, disabled: true }
+      { label: "MARKETPLACE", icon: Store, disabled: true },
+      { label: "SERVICES", icon: Swords, disabled: true }
     ]
   },
   {
