@@ -210,28 +210,115 @@ function bossKindLabel(boss: BossRecord) {
   return boss.type === "boss" ? "Boss" : "Mini boss";
 }
 
-function playAlertTone() {
+let alertAudioContext: AudioContext | null = null;
+
+function getAudioContextCtor() {
   const AudioContextCtor =
     window.AudioContext ??
     (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
 
+  return AudioContextCtor ?? null;
+}
+
+async function unlockAlertTone() {
+  const AudioContextCtor = getAudioContextCtor();
   if (!AudioContextCtor) {
+    return false;
+  }
+
+  try {
+    alertAudioContext ??= new AudioContextCtor();
+    if (alertAudioContext.state === "suspended") {
+      await alertAudioContext.resume();
+    }
+
+    return alertAudioContext.state === "running";
+  } catch {
+    return false;
+  }
+}
+
+async function playAlertTone() {
+  const ready = await unlockAlertTone();
+  const context = alertAudioContext;
+  if (!ready || !context) {
     return;
   }
 
-  const context = new AudioContextCtor();
   const oscillator = context.createOscillator();
   const gain = context.createGain();
+  const startAt = context.currentTime + 0.01;
   oscillator.type = "sine";
-  oscillator.frequency.setValueAtTime(880, context.currentTime);
-  oscillator.frequency.setValueAtTime(660, context.currentTime + 0.18);
-  gain.gain.setValueAtTime(0.001, context.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.18, context.currentTime + 0.03);
-  gain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + 0.42);
+  oscillator.frequency.setValueAtTime(880, startAt);
+  oscillator.frequency.setValueAtTime(660, startAt + 0.18);
+  gain.gain.setValueAtTime(0.001, startAt);
+  gain.gain.exponentialRampToValueAtTime(0.18, startAt + 0.03);
+  gain.gain.exponentialRampToValueAtTime(0.001, startAt + 0.42);
   oscillator.connect(gain);
   gain.connect(context.destination);
-  oscillator.start();
-  oscillator.stop(context.currentTime + 0.45);
+  oscillator.start(startAt);
+  oscillator.stop(startAt + 0.45);
+}
+
+async function requestBrowserNotificationPermission() {
+  if (!("Notification" in window)) {
+    return "unsupported" as const;
+  }
+
+  if (Notification.permission === "default") {
+    try {
+      return await Notification.requestPermission();
+    } catch {
+      return Notification.permission;
+    }
+  }
+
+  return Notification.permission;
+}
+
+function getNotificationIcon(boss?: BossRecord) {
+  const imageUrl = boss?.image_url || HERO_IMAGE;
+  if (!imageUrl || imageUrl.startsWith("data:")) {
+    return new URL(HERO_IMAGE, window.location.origin).href;
+  }
+
+  try {
+    return new URL(imageUrl, window.location.origin).href;
+  } catch {
+    return new URL(HERO_IMAGE, window.location.origin).href;
+  }
+}
+
+function showBrowserCooldownNotification(checkin: BossCheckin) {
+  if (!("Notification" in window) || Notification.permission !== "granted") {
+    return false;
+  }
+
+  try {
+    const bossName = checkin.boss?.name ?? "Boss";
+    const notification = new Notification("Boss pronto no Rubinot Help", {
+      body: `${bossName} saiu do cooldown.`,
+      icon: getNotificationIcon(checkin.boss),
+      silent: false,
+      tag: `rubinot-help:${checkin.id}`
+    });
+    notification.onclick = () => {
+      window.focus();
+      notification.close();
+    };
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function prepareCooldownAlerts() {
+  const [permission] = await Promise.all([
+    requestBrowserNotificationPermission(),
+    unlockAlertTone()
+  ]);
+
+  return permission;
 }
 
 export default function App() {
@@ -303,7 +390,8 @@ export default function App() {
       }
 
       localStorage.setItem(seenKey, "1");
-      playAlertTone();
+      void playAlertTone();
+      showBrowserCooldownNotification(checkin);
       pushToast({
         title: "Boss pronto",
         detail: `${checkin.boss?.name ?? "Boss"} saiu do cooldown.`,
@@ -355,11 +443,18 @@ export default function App() {
       return;
     }
 
+    const notificationPermission = await prepareCooldownAlerts();
     const checkin = await createBossCheckin(user, profile, boss);
     setCheckins((current) => [checkin, ...current]);
+    const alertHint =
+      notificationPermission === "granted"
+        ? " Notificacao do navegador ativa."
+        : notificationPermission === "denied"
+          ? " Notificacao do navegador bloqueada nas permissoes."
+          : "";
     pushToast({
       title: "Check-in salvo",
-      detail: `${boss.name} volta em ${formatDuration(boss.cooldown_minutes)}.`,
+      detail: `${boss.name} volta em ${formatDuration(boss.cooldown_minutes)}.${alertHint}`,
       tone: "success"
     });
   }
@@ -1062,8 +1157,8 @@ function BossCard({
   const remainingMinutes = activeCheckin ? minutesUntil(activeCheckin.cooldown_ends_at) : 0;
 
   return (
-    <article className="panel rounded-lg p-3">
-      <div className="flex items-center gap-3">
+    <article className="panel flex h-full min-h-[205px] flex-col rounded-lg p-3">
+      <div className="flex min-h-[120px] items-start gap-3">
         <div className="creature-frame h-[72px] w-[72px] shrink-0">
           <img alt={boss.name} className="creature-sprite" src={boss.image_url || HERO_IMAGE} />
         </div>
@@ -1075,32 +1170,34 @@ function BossCard({
             {boss.name}
           </h3>
           <p className="mt-1 text-xs font-bold text-ink/55">Cooldown {formatDuration(boss.cooldown_minutes)}</p>
-          {activeCheckin ? (
-            <p className="text-xs font-black text-ember">
-              Volta as {formatTime(activeCheckin.cooldown_ends_at)} · {formatDuration(remainingMinutes)}
-            </p>
-          ) : null}
+          <div className="mt-0.5 min-h-[2.1rem]">
+            {activeCheckin ? (
+              <p className="text-xs font-black text-ember">
+                Volta as {formatTime(activeCheckin.cooldown_ends_at)} · {formatDuration(remainingMinutes)}
+              </p>
+            ) : null}
+          </div>
         </div>
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-2">
+      <div className="mt-auto grid grid-cols-2 gap-2 pt-3">
         <button
-          className="btn-primary min-h-9 justify-center px-3 py-1.5 text-xs"
+          className="btn-primary h-14 min-w-0 justify-center px-2 py-2 text-sm leading-tight"
           disabled={Boolean(activeCheckin)}
           onClick={() => onCheckIn(boss)}
           title={userSignedIn ? "Iniciar temporizador" : "Entrar para iniciar temporizador"}
           type="button"
         >
           <CheckCircle2 className="h-4 w-4" />
-          {activeCheckin ? "Aguardando" : "Check-in"}
+          <span className="min-w-0 text-center leading-tight">{activeCheckin ? "Aguardando" : "Check-in"}</span>
         </button>
         <button
-          className="btn-secondary min-h-9 justify-center px-3 py-1.5 text-xs"
+          className="btn-secondary h-14 min-w-0 justify-center px-2 py-2 text-sm leading-tight"
           onClick={() => onDetails(boss)}
           type="button"
         >
           <BookOpen className="h-4 w-4" />
-          Mais informações
+          <span className="min-w-0 text-center leading-tight">Mais informações</span>
         </button>
       </div>
     </article>
