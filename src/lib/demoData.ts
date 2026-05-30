@@ -10,6 +10,9 @@ export function createDemoBosses(): BossRecord[] {
     {
       id: createId("boss"),
       name: "Ancient Scarab King",
+      full_name: "Ancient Scarab King",
+      popular_name: "Scarab King",
+      display_name_mode: "full",
       type: "boss",
       image_url: HERO_IMAGE,
       hp: 185000,
@@ -52,6 +55,9 @@ export function createDemoBosses(): BossRecord[] {
     {
       id: createId("boss"),
       name: "Frost Herald",
+      full_name: "Frost Herald",
+      popular_name: "Herald",
+      display_name_mode: "full",
       type: "mini-boss",
       image_url: HERO_IMAGE,
       hp: 72000,

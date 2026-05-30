@@ -5,9 +5,12 @@ export type ViewKey =
   | "bestiaryTracker"
   | "cooldowns"
   | "profile"
-  | "admin";
+  | "adminHub"
+  | "adminBossTracker";
 
 export type BossType = "boss" | "mini-boss";
+
+export type BossDisplayNameMode = "full" | "popular";
 
 export type Channel = "whatsapp";
 
@@ -32,6 +35,9 @@ export interface Profile {
 export interface BossRecord {
   id: string;
   name: string;
+  full_name: string;
+  popular_name: string;
+  display_name_mode: BossDisplayNameMode;
   type: BossType;
   image_url: string;
   hp: number;

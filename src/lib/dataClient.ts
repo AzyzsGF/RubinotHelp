@@ -2,6 +2,7 @@ import {
   AppUser,
   AuthState,
   BossCheckin,
+  BossDisplayNameMode,
   BossDraft,
   BossRecord,
   BossStep,
@@ -112,10 +113,21 @@ function mapBoss(row: Record<string, unknown>): BossRecord {
   const steps = Array.isArray(rawSteps)
     ? rawSteps.map((step, index) => mapBossStep(step, index)).sort((a, b) => a.sort_order - b.sort_order)
     : [];
+  const legacyName = String(row.name ?? "");
+  const fullName = String(row.full_name ?? legacyName);
+  const popularName = String(row.popular_name ?? "");
+  const displayNameMode: BossDisplayNameMode = row.display_name_mode === "popular" ? "popular" : "full";
+  const displayName =
+    displayNameMode === "popular"
+      ? popularName || fullName || legacyName
+      : fullName || popularName || legacyName;
 
   return {
     id: String(row.id),
-    name: String(row.name ?? ""),
+    name: displayName,
+    full_name: fullName,
+    popular_name: popularName,
+    display_name_mode: displayNameMode,
     type: row.type === "mini-boss" ? "mini-boss" : "boss",
     image_url: String(row.image_url ?? ""),
     hp: Number(row.hp ?? 0),
@@ -358,8 +370,16 @@ export async function listBosses(includeInactive = false) {
 
 export async function saveBoss(draft: BossDraft) {
   const now = nowIso();
+  const fullName = draft.full_name.trim() || draft.name.trim();
+  const popularName = draft.popular_name.trim();
+  const displayNameMode: BossDisplayNameMode = draft.display_name_mode === "popular" ? "popular" : "full";
+  const displayName =
+    displayNameMode === "popular" ? popularName || fullName : fullName || popularName;
   const payload = {
-    name: draft.name,
+    name: displayName,
+    full_name: fullName,
+    popular_name: popularName,
+    display_name_mode: displayNameMode,
     type: draft.type,
     image_url: draft.image_url,
     hp: draft.hp,

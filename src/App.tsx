@@ -10,6 +10,7 @@ import {
   Dumbbell,
   ExternalLink,
   Gavel,
+  LayoutDashboard,
   Link2,
   LogIn,
   LogOut,
@@ -76,6 +77,9 @@ import { createId, formatDateTime, formatDuration, formatTime, minutesUntil } fr
 
 const emptyBossDraft: BossDraft = {
   name: "",
+  full_name: "",
+  popular_name: "",
+  display_name_mode: "full",
   type: "boss",
   image_url: HERO_IMAGE,
   hp: 0,
@@ -111,7 +115,8 @@ const viewTitles: Record<ViewKey, string> = {
   bestiaryTracker: "BESTIARIO TRACKER",
   cooldowns: "Task Delivery",
   profile: "Perfil",
-  admin: "Admin"
+  adminHub: "Painel Admin",
+  adminBossTracker: "Editar Boss Tracker"
 };
 
 const sidebarSections: Array<{ title: string; items: SidebarItem[] }> = [
@@ -362,7 +367,7 @@ export default function App() {
             ) : null}
 
             <UserStrip
-              onAdminClick={() => setView("admin")}
+              onAdminClick={() => setView("adminHub")}
               onProfileClick={() => setView("profile")}
               onSignOut={handleSignOut}
               profile={profile}
@@ -431,7 +436,10 @@ export default function App() {
                   onSave={handleProfileSave}
                 />
               ) : null}
-              {view === "admin" ? (
+              {view === "adminHub" ? (
+                <AdminHubPanel isAdmin={Boolean(profile?.is_admin)} onNavigate={setView} />
+              ) : null}
+              {view === "adminBossTracker" ? (
                 <AdminPanel
                   bosses={bosses}
                   isAdmin={Boolean(profile?.is_admin)}
@@ -470,7 +478,8 @@ function SidebarSection({
 
       <div className="space-y-1">
         {section.items.map((item) => {
-          const locked = item.key === "admin" && !isAdmin;
+          const locked =
+            (item.key === "adminHub" || item.key === "adminBossTracker") && !isAdmin;
           return (
             <SidebarItemButton
               active={Boolean(item.key && activeView === item.key)}
@@ -578,10 +587,10 @@ function UserStrip({
         <button
           className="flex h-9 w-9 items-center justify-center rounded-md border border-white/10 bg-slate-950 text-slate-300 hover:text-red-400"
           onClick={onAdminClick}
-          title="Admin"
+          title="Painel admin"
           type="button"
         >
-          <Shield className="h-4 w-4" />
+          <LayoutDashboard className="h-4 w-4" />
         </button>
       ) : null}
       <button
@@ -885,7 +894,7 @@ function BossTrackerPanel({
         .map((step) => `${step.name} ${step.location} ${step.mechanics}`)
         .join(" ");
       const text =
-        `${boss.name} ${boss.location} ${boss.weaknesses.join(" ")} ${boss.damage_types.join(" ")} ${stepText}`.toLowerCase();
+        `${boss.name} ${boss.full_name} ${boss.popular_name} ${boss.location} ${boss.weaknesses.join(" ")} ${boss.damage_types.join(" ")} ${stepText}`.toLowerCase();
       return matchesType && text.includes(query.toLowerCase());
     });
   }, [bosses, query, type]);
@@ -994,7 +1003,9 @@ function BossCard({
           <p className="text-[10px] font-black uppercase tracking-[0.14em] text-ember">
             {boss.type === "boss" ? "Boss" : "Mini boss"}
           </p>
-          <h3 className="truncate text-base font-black text-ink">{boss.name}</h3>
+          <h3 className="line-clamp-2 min-h-[2.35rem] break-words text-base font-black leading-[1.15] text-ink">
+            {boss.name}
+          </h3>
           <p className="mt-1 text-xs font-bold text-ink/55">Cooldown {formatDuration(boss.cooldown_minutes)}</p>
           {activeCheckin ? (
             <p className="text-xs font-black text-ember">
@@ -1078,6 +1089,11 @@ function BossInfoModal({
           <div className="min-w-0">
             <p className="text-xs font-black uppercase tracking-[0.14em] text-ember">Boss Tracker</p>
             <h3 className="truncate text-xl font-black text-ink">{boss.name}</h3>
+            {boss.popular_name && boss.full_name && boss.popular_name !== boss.full_name ? (
+              <p className="truncate text-xs font-bold text-ink/55">
+                {boss.full_name} · popular: {boss.popular_name}
+              </p>
+            ) : null}
           </div>
           <button className="icon-button" onClick={onClose} title="Fechar" type="button">
             <X className="h-4 w-4" />
@@ -1468,6 +1484,90 @@ function ProfileForm({
   );
 }
 
+function AdminHubPanel({
+  isAdmin,
+  onNavigate
+}: {
+  isAdmin: boolean;
+  onNavigate: (view: ViewKey) => void;
+}) {
+  if (!isAdmin) {
+    return <EmptyState title="Painel admin bloqueado" />;
+  }
+
+  const items: Array<{
+    title: string;
+    description: string;
+    icon: typeof Activity;
+    view?: ViewKey;
+    disabled?: boolean;
+  }> = [
+    {
+      title: "Boss Tracker",
+      description: "Cadastrar bosses, cooldown, acesso, GIF e checklist.",
+      icon: Skull,
+      view: "adminBossTracker"
+    },
+    {
+      title: "Comprar/Vender RC",
+      description: "Configurar ofertas, regras e automacoes de RC.",
+      icon: Gavel,
+      disabled: true
+    },
+    {
+      title: "Marketplace",
+      description: "Editar itens, anuncios e filtros do marketplace.",
+      icon: Store,
+      disabled: true
+    },
+    {
+      title: "Services",
+      description: "Gerenciar servicos, categorias e pedidos.",
+      icon: Swords,
+      disabled: true
+    },
+    {
+      title: "Bestiario Tracker",
+      description: "Area futura para monstros, charms e progresso.",
+      icon: BookOpen,
+      disabled: true
+    }
+  ];
+
+  return (
+    <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      {items.map((item) => {
+        const Icon = item.icon;
+        return (
+          <button
+            className={clsx(
+              "panel flex min-h-44 flex-col items-start justify-between rounded-lg p-5 text-left transition hover:-translate-y-0.5",
+              item.disabled && "cursor-not-allowed opacity-65 hover:translate-y-0"
+            )}
+            disabled={item.disabled}
+            key={item.title}
+            onClick={() => item.view && onNavigate(item.view)}
+            type="button"
+          >
+            <span className="flex h-12 w-12 items-center justify-center rounded-lg bg-red-600 text-white shadow-[0_0_24px_rgba(220,38,38,0.24)]">
+              <Icon className="h-6 w-6" />
+            </span>
+            <span>
+              <span className="block text-lg font-black text-ink">{item.title}</span>
+              <span className="mt-1 block text-sm font-semibold leading-6 text-ink/65">
+                {item.description}
+              </span>
+            </span>
+            <span className="text-xs font-black uppercase tracking-[0.12em] text-ember">
+              {item.disabled ? "Em breve" : "Editar"}
+            </span>
+          </button>
+        );
+      })}
+    </section>
+  );
+}
+
 function AdminPanel({
   bosses,
   isAdmin,
@@ -1628,13 +1728,66 @@ function AdminPanel({
         </Field>
 
         <div className="grid gap-3 md:grid-cols-2">
-          <Field label="Nome">
-            <input
-              className="input"
-              onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
-              required
-              value={draft.name}
-            />
+          <Field label="Nome completo">
+            <div className="grid gap-2">
+              <input
+                className="input"
+                onChange={(event) =>
+                  setDraft((current) => ({
+                    ...current,
+                    full_name: event.target.value,
+                    name: current.display_name_mode === "full" ? event.target.value : current.name
+                  }))
+                }
+                required
+                value={draft.full_name}
+              />
+              <label className="flex items-center gap-2 rounded-lg border border-ink/10 bg-white/70 px-3 py-2 text-xs font-black uppercase tracking-[0.08em] text-ink/65">
+                <input
+                  checked={draft.display_name_mode === "full"}
+                  className="h-4 w-4 accent-ember"
+                  onChange={() =>
+                    setDraft((current) => ({
+                      ...current,
+                      display_name_mode: "full",
+                      name: current.full_name || current.name
+                    }))
+                  }
+                  type="checkbox"
+                />
+                Mostrar no card
+              </label>
+            </div>
+          </Field>
+          <Field label="Nome popular">
+            <div className="grid gap-2">
+              <input
+                className="input"
+                onChange={(event) =>
+                  setDraft((current) => ({
+                    ...current,
+                    popular_name: event.target.value,
+                    name: current.display_name_mode === "popular" ? event.target.value : current.name
+                  }))
+                }
+                value={draft.popular_name}
+              />
+              <label className="flex items-center gap-2 rounded-lg border border-ink/10 bg-white/70 px-3 py-2 text-xs font-black uppercase tracking-[0.08em] text-ink/65">
+                <input
+                  checked={draft.display_name_mode === "popular"}
+                  className="h-4 w-4 accent-ember"
+                  onChange={() =>
+                    setDraft((current) => ({
+                      ...current,
+                      display_name_mode: "popular",
+                      name: current.popular_name || current.full_name || current.name
+                    }))
+                  }
+                  type="checkbox"
+                />
+                Mostrar no card
+              </label>
+            </div>
           </Field>
           <Field label="Tipo">
             <select
