@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 
-const projectRef = "vrjbksazfwthaeynwkvm";
+const projectRef = "zzfqvclrqhlbqcmdnxpa";
 const localEnvFile = ".env.supabase.local";
 
 function loadLocalEnv(path) {
@@ -75,8 +75,12 @@ const result = spawnSync(
   ["supabase", "db", "push", "--db-url", dbUrl, "--yes"],
   {
     stdio: "inherit",
-    shell: false
+    shell: process.platform === "win32"
   }
 );
+
+if (result.error) {
+  console.error(result.error.message);
+}
 
 process.exit(result.status ?? 1);

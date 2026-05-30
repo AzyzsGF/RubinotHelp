@@ -218,7 +218,7 @@ export async function signUp(email: string, password: string, nick: string) {
     return getAuthState();
   }
 
-  const { error } = await supabase.auth.signUp({
+  const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
@@ -227,7 +227,20 @@ export async function signUp(email: string, password: string, nick: string) {
   });
 
   if (error) {
+    const authCode = (error as { code?: string }).code;
+    if (authCode === "over_email_send_rate_limit" || error.message.toLowerCase().includes("email rate")) {
+      throw new Error(
+        "Limite de envio de email do Supabase atingido. Aguarde alguns minutos ou desative a confirmacao de email no painel do Supabase."
+      );
+    }
+
     throw error;
+  }
+
+  if (!data.session) {
+    throw new Error(
+      "Conta criada, mas o Supabase pediu confirmacao por email. Confirme o email recebido ou desative a confirmacao no painel do Supabase para login imediato."
+    );
   }
 
   return getAuthState();

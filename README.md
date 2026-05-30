@@ -27,7 +27,7 @@ cp .env.example .env.local
 Este workspace ja tem um `.env.local` ignorado pelo git apontando para o projeto:
 
 ```text
-VITE_SUPABASE_URL=https://vrjbksazfwthaeynwkvm.supabase.co
+VITE_SUPABASE_URL=https://zzfqvclrqhlbqcmdnxpa.supabase.co
 VITE_SUPABASE_ANON_KEY=<sua publishable key>
 ```
 
@@ -47,7 +47,7 @@ npm run supabase:link
 npm run supabase:db:push:linked
 ```
 
-O `supabase:link` usa o project ref `vrjbksazfwthaeynwkvm`, mas em ambiente nao interativo ele exige `SUPABASE_ACCESS_TOKEN`.
+O `supabase:link` usa o project ref `zzfqvclrqhlbqcmdnxpa`, mas em ambiente nao interativo ele exige `SUPABASE_ACCESS_TOKEN`.
 
 ## Cloudflare Pages
 
@@ -56,7 +56,7 @@ Configure o projeto Pages com:
 - Build command: `npm run build`
 - Build output: `dist`
 - Environment variables:
-  - `VITE_SUPABASE_URL=https://vrjbksazfwthaeynwkvm.supabase.co`
+  - `VITE_SUPABASE_URL=https://zzfqvclrqhlbqcmdnxpa.supabase.co`
   - `VITE_SUPABASE_ANON_KEY=<sua publishable key>`
 
 ## Worker de WhatsApp

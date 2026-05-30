@@ -10,7 +10,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "supabase:login": "supabase login",
-    "supabase:link": "supabase link --project-ref vrjbksazfwthaeynwkvm",
+    "supabase:link": "supabase link --project-ref zzfqvclrqhlbqcmdnxpa",
     "supabase:db:push": "node scripts/supabase-db-push.mjs",
     "supabase:db:push:linked": "supabase db push",
     "worker:dev": "wrangler dev -c worker/wrangler.toml",
