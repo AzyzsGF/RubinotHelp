@@ -1,4 +1,11 @@
-export type ViewKey = "home" | "stamina" | "bestiary" | "cooldowns" | "profile" | "admin";
+export type ViewKey =
+  | "home"
+  | "stamina"
+  | "bossTracker"
+  | "bestiaryTracker"
+  | "cooldowns"
+  | "profile"
+  | "admin";
 
 export type BossType = "boss" | "mini-boss";
 

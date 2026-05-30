@@ -107,7 +107,8 @@ type SidebarItem = {
 const viewTitles: Record<ViewKey, string> = {
   home: "Início",
   stamina: "Calculadora de Stamina",
-  bestiary: "BOSS TRACKER",
+  bossTracker: "BOSS TRACKER",
+  bestiaryTracker: "BESTIARIO TRACKER",
   cooldowns: "Task Delivery",
   profile: "Perfil",
   admin: "Admin"
@@ -117,7 +118,7 @@ const sidebarSections: Array<{ title: string; items: SidebarItem[] }> = [
   {
     title: "Principal",
     items: [
-      { key: "bestiary", label: "BOSS TRACKER", icon: Skull },
+      { key: "bossTracker", label: "BOSS TRACKER", icon: Skull },
       { label: "COMPRAR/VENDER RC", icon: Gavel, disabled: true },
       { label: "MARKETPLACE", icon: Store, disabled: true },
       { label: "SERVICES", icon: Swords, disabled: true }
@@ -129,7 +130,7 @@ const sidebarSections: Array<{ title: string; items: SidebarItem[] }> = [
       { key: "stamina", label: "CALCULADORA DE STAMINA", icon: Clock3 },
       { label: "CALCULADORA DE SKILLS", icon: Calculator, disabled: true },
       { label: "OTIMIZADOR DE CHARMS", icon: Sparkles, disabled: true },
-      { key: "bestiary", label: "BESTIARIO TRACKER", icon: BookOpen },
+      { key: "bestiaryTracker", label: "BESTIARIO TRACKER", icon: BookOpen },
       { label: "CRONOMETRO", icon: AlarmClock, disabled: true }
     ]
   }
@@ -177,7 +178,7 @@ function playAlertTone() {
 }
 
 export default function App() {
-  const [view, setView] = useState<ViewKey>("bestiary");
+  const [view, setView] = useState<ViewKey>("bossTracker");
   const [user, setUser] = useState<{ id: string; email: string } | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [bosses, setBosses] = useState<BossRecord[]>([]);
@@ -286,7 +287,7 @@ export default function App() {
     setUser(null);
     setProfile(null);
     setCheckins([]);
-    setView("bestiary");
+    setView("bossTracker");
     pushToast({ title: "Sessão encerrada", tone: "info" });
   }
 
@@ -405,14 +406,15 @@ export default function App() {
                 />
               ) : null}
               {view === "stamina" ? <StaminaPanel /> : null}
-              {view === "bestiary" ? (
-                <BestiaryPanel
+              {view === "bossTracker" ? (
+                <BossTrackerPanel
                   bosses={bosses}
                   checkins={checkins}
                   userSignedIn={Boolean(user)}
                   onCheckIn={handleCheckIn}
                 />
               ) : null}
+              {view === "bestiaryTracker" ? <BestiaryTrackerPanel /> : null}
               {view === "cooldowns" ? (
                 <CooldownsPanel
                   checkins={checkins}
@@ -644,7 +646,7 @@ function HomePanel({
             Painel de caça, stamina e boss tracker.
           </h3>
           <div className="mt-7 flex flex-wrap gap-3">
-            <button className="btn-primary" onClick={() => onNavigate("bestiary")} type="button">
+            <button className="btn-primary" onClick={() => onNavigate("bossTracker")} type="button">
               <Skull className="h-4 w-4" />
               Boss Tracker
             </button>
@@ -861,7 +863,7 @@ function RuleRow({ left, right }: { left: string; right: string }) {
   );
 }
 
-function BestiaryPanel({
+function BossTrackerPanel({
   bosses,
   checkins,
   userSignedIn,
@@ -874,6 +876,7 @@ function BestiaryPanel({
 }) {
   const [query, setQuery] = useState("");
   const [type, setType] = useState<"all" | "boss" | "mini-boss">("all");
+  const [selectedBoss, setSelectedBoss] = useState<BossRecord | null>(null);
 
   const filtered = useMemo(() => {
     return bosses.filter((boss) => {
@@ -926,6 +929,7 @@ function BestiaryPanel({
             key={boss.id}
             boss={boss}
             checkins={checkins}
+            onDetails={setSelectedBoss}
             userSignedIn={userSignedIn}
             onCheckIn={onCheckIn}
           />
@@ -933,6 +937,31 @@ function BestiaryPanel({
       </div>
 
       {filtered.length === 0 ? <EmptyState title="Nenhum boss encontrado" /> : null}
+
+      {selectedBoss ? (
+        <BossInfoModal
+          boss={selectedBoss}
+          checkins={checkins}
+          onCheckIn={onCheckIn}
+          onClose={() => setSelectedBoss(null)}
+          userSignedIn={userSignedIn}
+        />
+      ) : null}
+    </section>
+  );
+}
+
+function BestiaryTrackerPanel() {
+  return (
+    <section className="panel flex min-h-[420px] items-center justify-center rounded-lg p-8 text-center">
+      <div className="max-w-xl">
+        <BookOpen className="mx-auto h-12 w-12 text-ember" />
+        <p className="mt-4 text-2xl font-black text-ink">Bestiario Tracker</p>
+        <p className="mt-2 text-sm font-semibold leading-6 text-ink/65">
+          Area separada para monstros, charms e progresso de bestiario. O Boss Tracker agora fica
+          exclusivo para bosses, cooldown e check-in.
+        </p>
+      </div>
     </section>
   );
 }
@@ -940,13 +969,77 @@ function BestiaryPanel({
 function BossCard({
   boss,
   checkins,
+  onDetails,
   userSignedIn,
   onCheckIn
 }: {
   boss: BossRecord;
   checkins: BossCheckin[];
+  onDetails: (boss: BossRecord) => void;
   userSignedIn: boolean;
   onCheckIn: (boss: BossRecord) => void;
+}) {
+  const activeCheckin = checkins.find(
+    (checkin) => checkin.boss_id === boss.id && minutesUntil(checkin.cooldown_ends_at) > 0
+  );
+  const remainingMinutes = activeCheckin ? minutesUntil(activeCheckin.cooldown_ends_at) : 0;
+
+  return (
+    <article className="panel rounded-lg p-3">
+      <div className="flex items-center gap-3">
+        <div className="creature-frame h-[72px] w-[72px] shrink-0">
+          <img alt={boss.name} className="creature-sprite" src={boss.image_url || HERO_IMAGE} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-ember">
+            {boss.type === "boss" ? "Boss" : "Mini boss"}
+          </p>
+          <h3 className="truncate text-base font-black text-ink">{boss.name}</h3>
+          <p className="mt-1 text-xs font-bold text-ink/55">Cooldown {formatDuration(boss.cooldown_minutes)}</p>
+          {activeCheckin ? (
+            <p className="text-xs font-black text-ember">
+              Volta as {formatTime(activeCheckin.cooldown_ends_at)} · {formatDuration(remainingMinutes)}
+            </p>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <button
+          className="btn-primary min-h-9 justify-center px-3 py-1.5 text-xs"
+          disabled={Boolean(activeCheckin)}
+          onClick={() => onCheckIn(boss)}
+          title={userSignedIn ? "Iniciar temporizador" : "Entrar para iniciar temporizador"}
+          type="button"
+        >
+          <CheckCircle2 className="h-4 w-4" />
+          {activeCheckin ? "Aguardando" : "Check-in"}
+        </button>
+        <button
+          className="btn-secondary min-h-9 justify-center px-3 py-1.5 text-xs"
+          onClick={() => onDetails(boss)}
+          type="button"
+        >
+          <BookOpen className="h-4 w-4" />
+          Mais informações
+        </button>
+      </div>
+    </article>
+  );
+}
+
+function BossInfoModal({
+  boss,
+  checkins,
+  onCheckIn,
+  onClose,
+  userSignedIn
+}: {
+  boss: BossRecord;
+  checkins: BossCheckin[];
+  onCheckIn: (boss: BossRecord) => void;
+  onClose: () => void;
+  userSignedIn: boolean;
 }) {
   const [checkedSteps, setCheckedSteps] = useState<Record<string, boolean>>({});
   const completedSteps = boss.steps.filter((step) => checkedSteps[step.id]).length;
@@ -979,16 +1072,46 @@ function BossCard({
   }
 
   return (
-    <article className="panel overflow-hidden rounded-lg">
-      <div className="creature-frame mx-auto mt-3 h-[92px] w-[92px]">
-        <img
-          alt={boss.name}
-          className="creature-sprite"
-          src={boss.image_url || HERO_IMAGE}
-        />
-      </div>
-      <div className="space-y-3 p-3">
-        <div className="flex items-start justify-between gap-3">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm">
+      <section className="panel max-h-[calc(100vh-2rem)] w-[min(960px,calc(100vw-2rem))] overflow-auto rounded-lg">
+        <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-ink/10 bg-white/90 px-4 py-3 backdrop-blur">
+          <div className="min-w-0">
+            <p className="text-xs font-black uppercase tracking-[0.14em] text-ember">Boss Tracker</p>
+            <h3 className="truncate text-xl font-black text-ink">{boss.name}</h3>
+          </div>
+          <button className="icon-button" onClick={onClose} title="Fechar" type="button">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="grid gap-5 p-4 lg:grid-cols-[180px_1fr]">
+          <div className="space-y-3">
+            <div className="creature-frame mx-auto h-36 w-36">
+              <img alt={boss.name} className="creature-sprite" src={boss.image_url || HERO_IMAGE} />
+            </div>
+            <div className="rounded-lg border border-ink/10 bg-white/70 p-3 text-center">
+              <p className="text-xs font-black uppercase tracking-[0.12em] text-ink/50">Cooldown</p>
+              <p className="mt-1 text-lg font-black text-ink">{formatDuration(boss.cooldown_minutes)}</p>
+              {activeCheckin ? (
+                <p className="mt-1 text-xs font-black text-ember">
+                  Volta as {formatTime(activeCheckin.cooldown_ends_at)}
+                </p>
+              ) : null}
+            </div>
+            <button
+              className="btn-primary w-full justify-center"
+              disabled={Boolean(activeCheckin)}
+              onClick={() => onCheckIn(boss)}
+              title={userSignedIn ? "Iniciar temporizador" : "Entrar para iniciar temporizador"}
+              type="button"
+            >
+              <CheckCircle2 className="h-4 w-4" />
+              {activeCheckin ? "Aguardando" : "Check-in"}
+            </button>
+          </div>
+
+          <div className="space-y-4">
+            <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-xs font-black uppercase tracking-[0.14em] text-ember">
               {boss.type === "boss" ? "Boss" : "Mini boss"}
@@ -1109,19 +1232,15 @@ function BossCard({
         ) : null}
 
         <div className="flex flex-wrap gap-2">
-          <button
-            className="btn-primary"
-            disabled={Boolean(activeCheckin)}
-            onClick={() => onCheckIn(boss)}
-            title={userSignedIn ? "Iniciar temporizador" : "Entrar para iniciar temporizador"}
-            type="button"
-          >
-            <CheckCircle2 className="h-4 w-4" />
-            {activeCheckin ? "Aguardando" : "Ja fiz"}
+          <button className="btn-secondary" onClick={onClose} type="button">
+            <X className="h-4 w-4" />
+            Fechar
           </button>
         </div>
-      </div>
-    </article>
+          </div>
+        </div>
+      </section>
+    </div>
   );
 }
 
