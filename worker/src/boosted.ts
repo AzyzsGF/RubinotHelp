@@ -16,7 +16,33 @@ export interface BoostedPayload {
   error?: string;
 }
 
-const RUBINOT_HOME_URL = "https://rubinot.com.br/";
+interface RubinotBoostedApiCreature {
+  id?: number | string;
+  name?: string;
+  looktype?: number | string;
+  lookType?: number | string;
+  lookTypeEx?: number | string;
+  addons?: number | string;
+  head?: number | string;
+  body?: number | string;
+  legs?: number | string;
+  feet?: number | string;
+  mount?: number | string;
+  mountHead?: number | string;
+  mountBody?: number | string;
+  mountLegs?: number | string;
+  mountFeet?: number | string;
+}
+
+interface RubinotBoostedApiPayload {
+  boss?: RubinotBoostedApiCreature;
+  monster?: RubinotBoostedApiCreature;
+}
+
+const RUBINOT_HOME_URL = "https://rubinot.net/";
+const RUBINOT_FALLBACK_HOME_URL = "https://rubinot.com.br/";
+const RUBINOT_BOOSTED_API_URL = "https://rubinot.net/api/boosted";
+const RUBINOT_OUTFIT_URL = "https://rubinot.net/api/outfit";
 const BOOSTED_BODY_CLASS = "BoostedBox-module__6IRxPW__body";
 
 export async function handleBoostedRequest() {
@@ -52,11 +78,38 @@ export function corsHeaders() {
 }
 
 async function fetchRubinotBoosted(): Promise<BoostedPayload> {
-  const response = await fetch(RUBINOT_HOME_URL, {
+  return fetchRubinotBoostedFallback();
+}
+
+async function fetchRubinotBoostedApi(): Promise<BoostedPayload> {
+  const response = await fetch(RUBINOT_BOOSTED_API_URL, {
+    headers: {
+      Accept: "application/json",
+      "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8",
+      Referer: RUBINOT_HOME_URL,
+      "User-Agent": "RubinotHelpBot/1.0 (+https://rubinot.net/)"
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(`RubinOT API respondeu HTTP ${response.status}.`);
+  }
+
+  const data = (await response.json()) as RubinotBoostedApiPayload;
+  return {
+    sourceUrl: RUBINOT_BOOSTED_API_URL,
+    fetchedAt: new Date().toISOString(),
+    boss: data.boss ? mapBoostedApiCreature("boss", data.boss) : undefined,
+    monster: data.monster ? mapBoostedApiCreature("monster", data.monster) : undefined
+  };
+}
+
+async function fetchRubinotBoostedFromHtml(sourceUrl: string): Promise<BoostedPayload> {
+  const response = await fetch(sourceUrl, {
     headers: {
       Accept: "text/html,application/xhtml+xml",
       "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8",
-      "User-Agent": "RubinotHelpBot/1.0 (+https://rubinot.com.br/)"
+      "User-Agent": "RubinotHelpBot/1.0 (+https://rubinot.net/)"
     }
   });
 
@@ -77,11 +130,61 @@ async function fetchRubinotBoosted(): Promise<BoostedPayload> {
     entries.find((entry) => entry !== boss);
 
   return {
-    sourceUrl: RUBINOT_HOME_URL,
+    sourceUrl,
     fetchedAt: new Date().toISOString(),
     boss,
     monster
   };
+}
+
+function mapBoostedApiCreature(
+  type: BoostedCreatureType,
+  creature: RubinotBoostedApiCreature
+): BoostedCreature {
+  const name = `${creature.name ?? (type === "boss" ? "Boss boosted" : "Monstro boosted")}`.trim();
+  return {
+    type,
+    label: type === "boss" ? "Boss" : "Monstro",
+    name,
+    imageUrl: buildOutfitImageUrl(creature),
+    href: RUBINOT_HOME_URL
+  };
+}
+
+function buildOutfitImageUrl(creature: RubinotBoostedApiCreature) {
+  const params = new URLSearchParams({
+    type: safeNumber(creature.looktype ?? creature.lookType, 128).toString(),
+    head: safeNumber(creature.head, 0).toString(),
+    body: safeNumber(creature.body, 0).toString(),
+    legs: safeNumber(creature.legs, 0).toString(),
+    feet: safeNumber(creature.feet, 0).toString(),
+    addons: safeNumber(creature.addons, 0).toString(),
+    direction: "3",
+    animated: "0",
+    walk: "0",
+    size: "0"
+  });
+
+  const lookTypeEx = safeNumber(creature.lookTypeEx, 0);
+  if (lookTypeEx > 0) {
+    params.set("typeex", lookTypeEx.toString());
+  }
+
+  const mount = safeNumber(creature.mount, 0);
+  if (mount > 0) {
+    params.set("mount", mount.toString());
+    params.set("mounthead", safeNumber(creature.mountHead, 0).toString());
+    params.set("mountbody", safeNumber(creature.mountBody, 0).toString());
+    params.set("mountlegs", safeNumber(creature.mountLegs, 0).toString());
+    params.set("mountfeet", safeNumber(creature.mountFeet, 0).toString());
+  }
+
+  return `${RUBINOT_OUTFIT_URL}?${params.toString()}`;
+}
+
+function safeNumber(value: unknown, fallback: number) {
+  const next = Number(value);
+  return Number.isFinite(next) ? next : fallback;
 }
 
 async function readLimitedText(response: Response, limit = 1_500_000) {
@@ -192,7 +295,23 @@ function toAbsoluteUrl(value?: string) {
   try {
     return new URL(value, RUBINOT_HOME_URL).href;
   } catch {
-    return undefined;
+    try {
+      return new URL(value, RUBINOT_FALLBACK_HOME_URL).href;
+    } catch {
+      return undefined;
+    }
+  }
+}
+
+async function fetchRubinotBoostedFallback(): Promise<BoostedPayload> {
+  try {
+    return await fetchRubinotBoostedApi();
+  } catch {
+    try {
+      return await fetchRubinotBoostedFromHtml(RUBINOT_HOME_URL);
+    } catch {
+      return fetchRubinotBoostedFromHtml(RUBINOT_FALLBACK_HOME_URL);
+    }
   }
 }
 

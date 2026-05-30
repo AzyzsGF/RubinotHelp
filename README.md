@@ -84,7 +84,7 @@ npm run worker:deploy
 
 O Worker roda a cada minuto e processa `notification_jobs` pendentes. Ele envia mensagens via `POST /message/sendText/{instance}` da Evolution API.
 
-Ele tambem expõe `GET /rubinot/boosted`, que consulta `https://rubinot.com.br/`, procura o bloco `BoostedBox-module__6IRxPW__body` e devolve o boss e o monstro boosted para o topo do site.
+Ele tambem expõe `GET /rubinot/boosted`, que consulta primeiro `https://rubinot.net/api/boosted`, monta as imagens via `https://rubinot.net/api/outfit` e devolve o boss e o monstro boosted para o topo do site. Se a API falhar, ele ainda tenta o HTML do RubinOT como fallback.
 
 ## Admin
 

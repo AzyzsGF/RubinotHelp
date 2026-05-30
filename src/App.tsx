@@ -1115,8 +1115,7 @@ function BoostedWidget({
 
       {!loading && data?.error ? (
         <p className="mt-2 max-w-[34rem] text-xs font-semibold leading-5 text-parchment/65">
-          Fonte automatica indisponivel agora. Confira direto no RubinOT ou configure o endpoint
-          do Worker.
+          Fonte automatica indisponivel agora. Confira direto no RubinOT enquanto tento novamente.
         </p>
       ) : null}
     </div>
