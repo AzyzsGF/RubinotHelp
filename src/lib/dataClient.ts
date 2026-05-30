@@ -7,7 +7,13 @@ import {
   BossDraft,
   BossRecord,
   BossStep,
-  Profile
+  ModerationStatus,
+  Profile,
+  ServiceCard,
+  ServiceCardDraft,
+  ServiceCategory,
+  ServiceReview,
+  ServiceReviewDraft
 } from "../types";
 import { createDemoBosses } from "./demoData";
 import { supabase, hasSupabaseConfig } from "./supabase";
@@ -24,7 +30,9 @@ const LOCAL_KEYS = {
   profiles: "rubinot-help:profiles",
   bosses: "rubinot-help:bosses",
   checkins: "rubinot-help:checkins",
-  jobs: "rubinot-help:jobs"
+  jobs: "rubinot-help:jobs",
+  serviceCards: "rubinot-help:service-cards",
+  serviceReviews: "rubinot-help:service-reviews"
 };
 
 export const usingDemoBackend = !hasSupabaseConfig;
@@ -81,6 +89,22 @@ function setLocalCheckins(checkins: BossCheckin[]) {
   writeLocal(LOCAL_KEYS.checkins, checkins);
 }
 
+function getLocalServiceCards() {
+  return readLocal<Record<string, unknown>[]>(LOCAL_KEYS.serviceCards, []).map((card) => mapServiceCard(card));
+}
+
+function setLocalServiceCards(cards: ServiceCard[]) {
+  writeLocal(LOCAL_KEYS.serviceCards, cards);
+}
+
+function getLocalServiceReviews() {
+  return readLocal<Record<string, unknown>[]>(LOCAL_KEYS.serviceReviews, []).map((review) => mapServiceReview(review));
+}
+
+function setLocalServiceReviews(reviews: ServiceReview[]) {
+  writeLocal(LOCAL_KEYS.serviceReviews, reviews);
+}
+
 function getCurrentLocalUser(): AppUser | null {
   const userId = localStorage.getItem(LOCAL_KEYS.session);
   if (!userId) {
@@ -93,6 +117,17 @@ function getCurrentLocalUser(): AppUser | null {
 
 function normalizeList(value: string[] | null | undefined) {
   return Array.isArray(value) ? value.filter(Boolean) : [];
+}
+
+function normalizeCategories(value: string[] | null | undefined): ServiceCategory[] {
+  const allowed: ServiceCategory[] = ["experience", "bestiary", "task"];
+  return normalizeList(value).filter((item): item is ServiceCategory =>
+    allowed.includes(item as ServiceCategory)
+  );
+}
+
+function normalizeStatus(value: unknown): ModerationStatus {
+  return value === "approved" || value === "rejected" ? value : "pending";
 }
 
 function mapBossStep(row: Record<string, unknown>, index = 0): BossStep {
@@ -170,6 +205,74 @@ function mapCheckin(row: Record<string, unknown>): BossCheckin {
   };
 }
 
+function mapServiceReview(row: Record<string, unknown>): ServiceReview {
+  return {
+    id: String(row.id ?? createId("review")),
+    service_card_id: String(row.service_card_id ?? ""),
+    user_id: String(row.user_id ?? ""),
+    user_nick: String(row.user_nick ?? ""),
+    rating: Number(row.rating ?? 0),
+    comment: String(row.comment ?? ""),
+    screenshot_url: String(row.screenshot_url ?? ""),
+    status: normalizeStatus(row.status),
+    rejection_reason: String(row.rejection_reason ?? ""),
+    created_at: String(row.created_at ?? nowIso()),
+    updated_at: String(row.updated_at ?? nowIso())
+  };
+}
+
+function mapServiceCard(row: Record<string, unknown>): ServiceCard {
+  const rawReviews = row.reviews as Record<string, unknown>[] | null | undefined;
+  const reviews = Array.isArray(rawReviews)
+    ? rawReviews.map((review) => mapServiceReview(review)).sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      )
+    : [];
+
+  return {
+    id: String(row.id ?? createId("service")),
+    user_id: String(row.user_id ?? ""),
+    title: String(row.title ?? ""),
+    categories: normalizeCategories(row.categories as string[]),
+    price_amount: Number(row.price_amount ?? 0),
+    price_hours: Number(row.price_hours ?? 1),
+    package_hours: Number(row.package_hours ?? 0),
+    package_hour_price: Number(row.package_hour_price ?? 0),
+    description: String(row.description ?? ""),
+    provider_bio: String(row.provider_bio ?? ""),
+    whatsapp: String(row.whatsapp ?? ""),
+    banner_url: String(row.banner_url ?? ""),
+    provider_nick: String(row.provider_nick ?? ""),
+    provider_avatar_url: String(row.provider_avatar_url ?? ""),
+    status: normalizeStatus(row.status),
+    rejection_reason: String(row.rejection_reason ?? ""),
+    approved_at: row.approved_at ? String(row.approved_at) : null,
+    created_at: String(row.created_at ?? nowIso()),
+    updated_at: String(row.updated_at ?? nowIso()),
+    reviews
+  };
+}
+
+function servicePayloadFromDraft(draft: ServiceCardDraft, user: AppUser, profile: Profile | null) {
+  return {
+    user_id: user.id,
+    title: draft.title.trim(),
+    categories: draft.categories,
+    price_amount: Number(draft.price_amount) || 0,
+    price_hours: Math.max(0.25, Number(draft.price_hours) || 1),
+    package_hours: Math.max(0, Number(draft.package_hours) || 0),
+    package_hour_price: Math.max(0, Number(draft.package_hour_price) || 0),
+    description: draft.description.trim(),
+    provider_bio: draft.provider_bio.trim(),
+    whatsapp: draft.whatsapp.replace(/\D/g, ""),
+    banner_url: draft.banner_url,
+    provider_nick: (profile?.nick || draft.provider_nick || user.email).trim(),
+    provider_avatar_url: profile?.avatar_url || draft.provider_avatar_url || "",
+    status: "pending" as ModerationStatus,
+    rejection_reason: ""
+  };
+}
+
 function requireSupabase() {
   if (!supabase) {
     throw new Error("Supabase nao configurado.");
@@ -195,6 +298,7 @@ async function getSupabaseProfile(user: AppUser): Promise<Profile> {
     email: user.email,
     nick: "",
     whatsapp: "",
+    avatar_url: "",
     whatsapp_opt_in: false,
     is_admin: false
   };
@@ -248,6 +352,7 @@ export async function signUp(email: string, password: string, nick: string) {
       email,
       nick,
       whatsapp: "",
+      avatar_url: "",
       whatsapp_opt_in: false,
       is_admin: users.length === 0,
       created_at: created,
@@ -323,6 +428,7 @@ export async function updateProfile(userId: string, patch: Partial<Profile>) {
   const allowed = {
     nick: patch.nick ?? "",
     whatsapp: patch.whatsapp ?? "",
+    avatar_url: patch.avatar_url ?? "",
     whatsapp_opt_in: Boolean(patch.whatsapp_opt_in)
   };
 
@@ -347,6 +453,61 @@ export async function updateProfile(userId: string, patch: Partial<Profile>) {
   }
 
   return data as Profile;
+}
+
+export async function updateAccountEmail(userId: string, email: string) {
+  const nextEmail = email.trim().toLowerCase();
+  if (!nextEmail) {
+    throw new Error("Informe um email valido.");
+  }
+
+  if (!supabase) {
+    const users = getLocalUsers();
+    if (users.some((user) => user.id !== userId && user.email.toLowerCase() === nextEmail)) {
+      throw new Error("Este email ja esta cadastrado.");
+    }
+
+    setLocalUsers(users.map((user) => (user.id === userId ? { ...user, email: nextEmail } : user)));
+    const profiles = getLocalProfiles().map((profile) =>
+      profile.id === userId ? { ...profile, email: nextEmail, updated_at: nowIso() } : profile
+    );
+    setLocalProfiles(profiles);
+    return profiles.find((profile) => profile.id === userId) ?? null;
+  }
+
+  const { error: authError } = await supabase.auth.updateUser({ email: nextEmail });
+  if (authError) {
+    throw authError;
+  }
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .update({ email: nextEmail })
+    .eq("id", userId)
+    .select("*")
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return data as Profile;
+}
+
+export async function updateAccountPassword(userId: string, password: string) {
+  if (password.length < 6) {
+    throw new Error("A senha precisa ter pelo menos 6 caracteres.");
+  }
+
+  if (!supabase) {
+    setLocalUsers(getLocalUsers().map((user) => (user.id === userId ? { ...user, password } : user)));
+    return;
+  }
+
+  const { error } = await supabase.auth.updateUser({ password });
+  if (error) {
+    throw error;
+  }
 }
 
 export async function listBosses(includeInactive = false) {
@@ -541,12 +702,7 @@ export async function deleteBoss(id: string) {
 
 export async function uploadBossImage(file: File) {
   if (!supabase) {
-    return new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result));
-      reader.onerror = () => reject(new Error("Nao foi possivel ler a imagem."));
-      reader.readAsDataURL(file);
-    });
+    return readFileAsDataUrl(file);
   }
 
   const safeName = file.name.toLowerCase().replace(/[^a-z0-9.]+/g, "-");
@@ -562,6 +718,276 @@ export async function uploadBossImage(file: File) {
 
   const { data } = supabase.storage.from("boss-images").getPublicUrl(path);
   return data.publicUrl;
+}
+
+function readFileAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error("Nao foi possivel ler a imagem."));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function uploadPublicImage(bucket: string, file: File, userId: string, prefix: string) {
+  if (!supabase) {
+    return readFileAsDataUrl(file);
+  }
+
+  const safeName = file.name.toLowerCase().replace(/[^a-z0-9.]+/g, "-");
+  const path = `${userId}/${createId(prefix)}-${safeName}`;
+  const { error } = await supabase.storage.from(bucket).upload(path, file, {
+    cacheControl: "3600",
+    upsert: false
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+  return data.publicUrl;
+}
+
+export async function uploadProfileAvatar(userId: string, file: File) {
+  return uploadPublicImage("profile-avatars", file, userId, "avatar");
+}
+
+export async function uploadServiceBanner(userId: string, file: File) {
+  return uploadPublicImage("service-banners", file, userId, "service-banner");
+}
+
+export async function uploadReviewScreenshot(userId: string, file: File) {
+  return uploadPublicImage("service-review-screens", file, userId, "service-review");
+}
+
+export async function listServiceCards(includeAll = false) {
+  if (!supabase) {
+    return getLocalServiceCards()
+      .filter((card) => includeAll || card.status === "approved")
+      .map((card) => ({
+        ...card,
+        reviews: getLocalServiceReviews().filter(
+          (review) =>
+            review.service_card_id === card.id && (includeAll || review.status === "approved")
+        )
+      }))
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  }
+
+  const query = supabase
+    .from("service_cards")
+    .select("*, reviews:service_reviews(*)")
+    .order("created_at", { ascending: false })
+    .order("created_at", { referencedTable: "service_reviews", ascending: false });
+
+  const { data, error } = includeAll ? await query : await query.eq("status", "approved");
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []).map((row) => mapServiceCard(row as Record<string, unknown>));
+}
+
+export async function saveServiceCard(user: AppUser, profile: Profile | null, draft: ServiceCardDraft) {
+  const now = nowIso();
+  const payload = servicePayloadFromDraft(draft, user, profile);
+
+  if (!payload.title || payload.categories.length === 0 || !payload.description || !payload.provider_bio) {
+    throw new Error("Preencha titulo, categoria, descricao e sobre o serviceiro.");
+  }
+
+  if (!supabase) {
+    const cards = getLocalServiceCards();
+    const existing = draft.id ? cards.find((card) => card.id === draft.id) : cards.find((card) => card.user_id === user.id);
+    const saved: ServiceCard = existing
+      ? {
+          ...existing,
+          ...payload,
+          id: existing.id,
+          updated_at: now
+        }
+      : {
+          ...payload,
+          id: createId("service"),
+          approved_at: null,
+          created_at: now,
+          updated_at: now,
+          reviews: []
+        };
+
+    const next = existing
+      ? cards.map((card) => (card.id === existing.id ? saved : card))
+      : [...cards, saved];
+    setLocalServiceCards(next);
+    return saved;
+  }
+
+  const upsertPayload = draft.id ? { ...payload, id: draft.id } : payload;
+  const { data, error } = await supabase
+    .from("service_cards")
+    .upsert(upsertPayload, { onConflict: "user_id" })
+    .select("*, reviews:service_reviews(*)")
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return mapServiceCard(data as Record<string, unknown>);
+}
+
+export async function adminSaveServiceCard(draft: ServiceCard) {
+  const payload = {
+    title: draft.title.trim(),
+    categories: draft.categories,
+    price_amount: Number(draft.price_amount) || 0,
+    price_hours: Math.max(0.25, Number(draft.price_hours) || 1),
+    package_hours: Math.max(0, Number(draft.package_hours) || 0),
+    package_hour_price: Math.max(0, Number(draft.package_hour_price) || 0),
+    description: draft.description.trim(),
+    provider_bio: draft.provider_bio.trim(),
+    whatsapp: draft.whatsapp.replace(/\D/g, ""),
+    banner_url: draft.banner_url,
+    provider_nick: draft.provider_nick.trim(),
+    provider_avatar_url: draft.provider_avatar_url,
+    status: draft.status,
+    rejection_reason: draft.status === "rejected" ? draft.rejection_reason : "",
+    approved_at: draft.status === "approved" ? draft.approved_at ?? nowIso() : null
+  };
+
+  if (!supabase) {
+    const saved = { ...draft, ...payload, updated_at: nowIso() };
+    setLocalServiceCards(getLocalServiceCards().map((card) => (card.id === draft.id ? saved : card)));
+    return saved;
+  }
+
+  const { data, error } = await supabase
+    .from("service_cards")
+    .update(payload)
+    .eq("id", draft.id)
+    .select("*, reviews:service_reviews(*)")
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return mapServiceCard(data as Record<string, unknown>);
+}
+
+export async function deleteServiceCard(id: string) {
+  if (!supabase) {
+    setLocalServiceCards(getLocalServiceCards().filter((card) => card.id !== id));
+    setLocalServiceReviews(getLocalServiceReviews().filter((review) => review.service_card_id !== id));
+    return;
+  }
+
+  const { error } = await supabase.from("service_cards").delete().eq("id", id);
+  if (error) {
+    throw error;
+  }
+}
+
+export async function setServiceCardStatus(id: string, status: ModerationStatus, reason = "") {
+  const patch = {
+    status,
+    rejection_reason: status === "rejected" ? reason : "",
+    approved_at: status === "approved" ? nowIso() : null
+  };
+
+  if (!supabase) {
+    setLocalServiceCards(
+      getLocalServiceCards().map((card) => (card.id === id ? { ...card, ...patch, updated_at: nowIso() } : card))
+    );
+    return;
+  }
+
+  const { error } = await supabase.from("service_cards").update(patch).eq("id", id);
+  if (error) {
+    throw error;
+  }
+}
+
+export async function saveServiceReview(user: AppUser, profile: Profile | null, draft: ServiceReviewDraft) {
+  if (draft.comment.trim().length < 30) {
+    throw new Error("A avaliacao precisa ter pelo menos 30 caracteres.");
+  }
+
+  if (!draft.screenshot_url) {
+    throw new Error("Envie uma print do service para avaliar.");
+  }
+
+  const now = nowIso();
+  const payload = {
+    service_card_id: draft.service_card_id,
+    user_id: user.id,
+    user_nick: profile?.nick || user.email,
+    rating: draft.rating,
+    comment: draft.comment.trim(),
+    screenshot_url: draft.screenshot_url,
+    status: "pending" as ModerationStatus,
+    rejection_reason: ""
+  };
+
+  if (!supabase) {
+    const cards = getLocalServiceCards();
+    const target = cards.find((card) => card.id === draft.service_card_id);
+    if (!target || target.status !== "approved" || target.user_id === user.id) {
+      throw new Error("Voce nao pode avaliar este card.");
+    }
+
+    const reviews = getLocalServiceReviews();
+    const existing = reviews.find((review) => review.service_card_id === draft.service_card_id && review.user_id === user.id);
+    const saved: ServiceReview = existing
+      ? { ...existing, ...payload, updated_at: now }
+      : { ...payload, id: createId("review"), created_at: now, updated_at: now };
+    setLocalServiceReviews(existing ? reviews.map((review) => (review.id === existing.id ? saved : review)) : [...reviews, saved]);
+    return saved;
+  }
+
+  const { data, error } = await supabase
+    .from("service_reviews")
+    .upsert(payload, { onConflict: "service_card_id,user_id" })
+    .select("*")
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return mapServiceReview(data as Record<string, unknown>);
+}
+
+export async function setServiceReviewStatus(id: string, status: ModerationStatus, reason = "") {
+  const patch = {
+    status,
+    rejection_reason: status === "rejected" ? reason : ""
+  };
+
+  if (!supabase) {
+    setLocalServiceReviews(
+      getLocalServiceReviews().map((review) => (review.id === id ? { ...review, ...patch, updated_at: nowIso() } : review))
+    );
+    return;
+  }
+
+  const { error } = await supabase.from("service_reviews").update(patch).eq("id", id);
+  if (error) {
+    throw error;
+  }
+}
+
+export async function deleteServiceReview(id: string) {
+  if (!supabase) {
+    setLocalServiceReviews(getLocalServiceReviews().filter((review) => review.id !== id));
+    return;
+  }
+
+  const { error } = await supabase.from("service_reviews").delete().eq("id", id);
+  if (error) {
+    throw error;
+  }
 }
 
 export async function listUserCheckins(userId: string) {

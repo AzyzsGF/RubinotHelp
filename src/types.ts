@@ -2,11 +2,13 @@ export type ViewKey =
   | "home"
   | "stamina"
   | "bossTracker"
+  | "services"
   | "bestiaryTracker"
   | "cooldowns"
   | "profile"
   | "adminHub"
-  | "adminBossTracker";
+  | "adminBossTracker"
+  | "adminServices";
 
 export type BossType = "boss" | "mini-boss";
 
@@ -18,6 +20,10 @@ export type Channel = "whatsapp";
 
 export type JobStatus = "pending" | "sent" | "failed" | "skipped";
 
+export type ModerationStatus = "pending" | "approved" | "rejected";
+
+export type ServiceCategory = "experience" | "bestiary" | "task";
+
 export interface AppUser {
   id: string;
   email: string;
@@ -28,6 +34,7 @@ export interface Profile {
   email: string;
   nick: string;
   whatsapp: string;
+  avatar_url: string;
   whatsapp_opt_in: boolean;
   is_admin: boolean;
   created_at: string;
@@ -103,6 +110,59 @@ export interface NotificationJob {
   sent_at: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface ServiceReview {
+  id: string;
+  service_card_id: string;
+  user_id: string;
+  user_nick: string;
+  rating: number;
+  comment: string;
+  screenshot_url: string;
+  status: ModerationStatus;
+  rejection_reason: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ServiceCard {
+  id: string;
+  user_id: string;
+  title: string;
+  categories: ServiceCategory[];
+  price_amount: number;
+  price_hours: number;
+  package_hours: number;
+  package_hour_price: number;
+  description: string;
+  provider_bio: string;
+  whatsapp: string;
+  banner_url: string;
+  provider_nick: string;
+  provider_avatar_url: string;
+  status: ModerationStatus;
+  rejection_reason: string;
+  approved_at: string | null;
+  created_at: string;
+  updated_at: string;
+  reviews: ServiceReview[];
+}
+
+export type ServiceCardDraft = Omit<
+  ServiceCard,
+  "id" | "user_id" | "status" | "rejection_reason" | "approved_at" | "created_at" | "updated_at" | "reviews"
+> & {
+  id?: string;
+  status?: ModerationStatus;
+  rejection_reason?: string;
+};
+
+export interface ServiceReviewDraft {
+  service_card_id: string;
+  rating: number;
+  comment: string;
+  screenshot_url: string;
 }
 
 export interface AuthState {
