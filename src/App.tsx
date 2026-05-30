@@ -87,6 +87,13 @@ import {
 } from "./lib/dataClient";
 import { HERO_IMAGE } from "./lib/demoData";
 import {
+  BoostedCreature,
+  BoostedPayload,
+  fetchBoostedCreatures,
+  RUBINOT_SITE_URL,
+  RUBINOT_WIKI_URL
+} from "./lib/boosted";
+import {
   calculateStaminaProjection,
   formatStamina,
   getStaminaBand,
@@ -191,6 +198,10 @@ const sidebarSections: Array<{ title: string; items: SidebarItem[] }> = [
       { key: "bestiaryTracker", label: "BESTIARIO TRACKER", icon: BookOpen },
       { label: "CRONOMETRO", icon: AlarmClock, disabled: true }
     ]
+  },
+  {
+    title: "Comunidade",
+    items: [{ label: "RUBINOT WIKI", icon: BookOpen, href: RUBINOT_WIKI_URL }]
   }
 ];
 
@@ -408,6 +419,8 @@ export default function App() {
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [clock, setClock] = useState(Date.now());
+  const [boosted, setBoosted] = useState<BoostedPayload | null>(null);
+  const [boostedLoading, setBoostedLoading] = useState(true);
 
   const pushToast = useCallback((toast: Omit<ToastMessage, "id">) => {
     const id = createId("toast");
@@ -450,6 +463,46 @@ export default function App() {
   useEffect(() => {
     const timer = window.setInterval(() => setClock(Date.now()), 30_000);
     return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    let controller = new AbortController();
+
+    async function loadBoosted() {
+      try {
+        setBoostedLoading(true);
+        const next = await fetchBoostedCreatures(controller.signal);
+        if (active) {
+          setBoosted(next);
+        }
+      } catch (error) {
+        if (active && !(error instanceof DOMException && error.name === "AbortError")) {
+          setBoosted({
+            sourceUrl: RUBINOT_SITE_URL,
+            fetchedAt: new Date().toISOString(),
+            error: error instanceof Error ? error.message : "Falha ao buscar boosted diario."
+          });
+        }
+      } finally {
+        if (active) {
+          setBoostedLoading(false);
+        }
+      }
+    }
+
+    void loadBoosted();
+    const timer = window.setInterval(() => {
+      controller.abort();
+      controller = new AbortController();
+      void loadBoosted();
+    }, 5 * 60 * 1000);
+
+    return () => {
+      active = false;
+      controller.abort();
+      window.clearInterval(timer);
+    };
   }, []);
 
   useEffect(() => {
@@ -734,17 +787,29 @@ export default function App() {
         </aside>
 
         <main className="min-w-0 flex-1 px-4 py-4 lg:px-6">
-          <div className="site-topbar mb-4 flex flex-col gap-3 rounded-lg px-4 py-3 text-parchment shadow-panel md:flex-row md:items-center md:justify-between">
+          <div className="site-topbar mb-4 flex flex-col gap-3 rounded-lg px-4 py-3 text-parchment shadow-panel xl:flex-row xl:items-center xl:justify-between">
             <div>
               <p className="text-xs uppercase tracking-[0.18em] text-brass">Servidor RubinOT</p>
               <h2 className="text-xl font-black tracking-normal md:text-2xl">
                 {viewTitles[view]}
               </h2>
             </div>
-            <div className="flex flex-wrap items-center gap-2 text-sm">
-              <Badge tone="fire">Bestiary 2x</Badge>
-              <Badge tone="fire">Loot 2.5x</Badge>
-              <Badge tone="stone">Save 10:00 UTC-3</Badge>
+            <div className="flex min-w-0 flex-col items-start gap-2 xl:items-end">
+              <div className="flex flex-wrap items-center gap-2 text-sm">
+                <Badge tone="fire">Bestiary 2x</Badge>
+                <Badge tone="fire">Loot 2.5x</Badge>
+                <Badge tone="stone">Save 10:00 UTC-3</Badge>
+                <a
+                  className="inline-flex min-h-7 items-center gap-1 rounded-full border border-brass/40 bg-brass/15 px-3 py-1 text-xs font-black text-parchment transition hover:bg-brass/25"
+                  href={RUBINOT_WIKI_URL}
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  <BookOpen className="h-3.5 w-3.5" />
+                  Wiki oficial
+                </a>
+              </div>
+              <BoostedWidget data={boosted} loading={boostedLoading} />
             </div>
           </div>
 
@@ -1007,6 +1072,100 @@ function Badge({ children, tone }: { children: string; tone: "green" | "fire" | 
       {children}
     </span>
   );
+}
+
+function BoostedWidget({
+  data,
+  loading
+}: {
+  data: BoostedPayload | null;
+  loading: boolean;
+}) {
+  return (
+    <div className="boosted-widget w-full min-w-0 xl:w-auto">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-[0.68rem] font-black uppercase tracking-[0.18em] text-brass">
+          Boosted diario
+        </span>
+        <a
+          className="inline-flex items-center gap-1 text-[0.68rem] font-black uppercase tracking-[0.08em] text-parchment/70 transition hover:text-parchment"
+          href={RUBINOT_SITE_URL}
+          rel="noreferrer"
+          target="_blank"
+        >
+          RubinOT
+          <ExternalLink className="h-3 w-3" />
+        </a>
+      </div>
+
+      <div className="mt-2 grid gap-2 sm:grid-cols-2">
+        <BoostedCreatureChip
+          creature={data?.boss}
+          icon={Skull}
+          label="Boss"
+          loading={loading}
+        />
+        <BoostedCreatureChip
+          creature={data?.monster}
+          icon={Sparkles}
+          label="Monstro"
+          loading={loading}
+        />
+      </div>
+
+      {!loading && data?.error ? (
+        <p className="mt-2 max-w-[34rem] text-xs font-semibold leading-5 text-parchment/65">
+          Fonte automatica indisponivel agora. Confira direto no RubinOT ou configure o endpoint
+          do Worker.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function BoostedCreatureChip({
+  creature,
+  icon: Icon,
+  label,
+  loading
+}: {
+  creature?: BoostedCreature;
+  icon: typeof Activity;
+  label: string;
+  loading: boolean;
+}) {
+  const content = (
+    <>
+      <span className="boosted-creature-image">
+        {creature?.imageUrl ? (
+          <img alt="" src={creature.imageUrl} />
+        ) : (
+          <Icon className="h-5 w-5 text-brass" />
+        )}
+      </span>
+      <span className="min-w-0">
+        <span className="block text-[0.62rem] font-black uppercase tracking-[0.16em] text-brass">
+          {label}
+        </span>
+        <span className="block truncate text-sm font-black text-parchment">
+          {loading ? "Buscando..." : creature?.name || "Nao encontrado"}
+        </span>
+      </span>
+    </>
+  );
+
+  const className =
+    "boosted-creature flex min-w-0 items-center gap-2 rounded-lg border border-white/10 bg-black/24 p-2 text-left";
+
+  if (creature?.href) {
+    return (
+      <a className={className} href={creature.href} rel="noreferrer" target="_blank">
+        {content}
+      </a>
+    );
+  }
+
+  return <div className={className}>{content}</div>;
 }
 
 function HomePanel({

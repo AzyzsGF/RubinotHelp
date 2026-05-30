@@ -55,6 +55,53 @@ textarea:focus-visible {
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
+.boosted-widget {
+  border: 1px solid rgba(255, 59, 33, 0.22);
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 90% 12%, rgba(255, 59, 33, 0.16), transparent 10rem),
+    rgba(7, 10, 13, 0.45);
+  padding: 10px;
+}
+
+.boosted-creature {
+  min-width: 180px;
+  text-decoration: none;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    transform 160ms ease;
+}
+
+.boosted-creature:hover {
+  border-color: rgba(255, 59, 33, 0.4);
+  background: rgba(255, 59, 33, 0.1);
+  transform: translateY(-1px);
+}
+
+.boosted-creature-image {
+  display: flex;
+  height: 38px;
+  width: 38px;
+  flex: 0 0 38px;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid rgba(255, 59, 33, 0.28);
+  border-radius: 7px;
+  background:
+    radial-gradient(circle at 50% 42%, rgba(255, 59, 33, 0.18), transparent 62%),
+    rgba(3, 6, 8, 0.78);
+}
+
+.boosted-creature-image img {
+  display: block;
+  max-height: 32px;
+  max-width: 32px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
 .panel {
   border: 1px solid rgba(24, 33, 27, 0.12);
   background: rgba(255, 252, 246, 0.9);

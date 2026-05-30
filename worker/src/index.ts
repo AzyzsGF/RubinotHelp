@@ -1,3 +1,5 @@
+import { corsHeaders, handleBoostedRequest } from "./boosted";
+
 interface Env {
   SUPABASE_URL: string;
   SUPABASE_SERVICE_ROLE_KEY: string;
@@ -52,6 +54,17 @@ export default {
   async fetch(request: Request, env: Env) {
     const url = new URL(request.url);
 
+    if (request.method === "OPTIONS") {
+      return new Response(null, {
+        status: 204,
+        headers: corsHeaders()
+      });
+    }
+
+    if (request.method === "GET" && url.pathname === "/rubinot/boosted") {
+      return handleBoostedRequest();
+    }
+
     if (request.method === "POST" && url.pathname === "/run") {
       if (env.CRON_SECRET && request.headers.get("x-cron-secret") !== env.CRON_SECRET) {
         return json({ error: "Unauthorized" }, 401);
@@ -63,7 +76,7 @@ export default {
     return json({
       ok: true,
       service: "rubinot-help-notifications",
-      routes: ["POST /run"]
+      routes: ["GET /rubinot/boosted", "POST /run"]
     });
   },
 
@@ -249,11 +262,12 @@ function retryDelayMinutes(attempts: number) {
   return Math.min(30, attempts * 5);
 }
 
-function json(payload: unknown, status = 200) {
+function json(payload: unknown, status = 200, headers: Record<string, string> = {}) {
   return new Response(JSON.stringify(payload), {
     status,
     headers: {
-      "Content-Type": "application/json; charset=utf-8"
+      "Content-Type": "application/json; charset=utf-8",
+      ...headers
     }
   });
 }

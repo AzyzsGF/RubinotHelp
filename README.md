@@ -58,6 +58,9 @@ Configure o projeto Pages com:
 - Environment variables:
   - `VITE_SUPABASE_URL=https://zzfqvclrqhlbqcmdnxpa.supabase.co`
   - `VITE_SUPABASE_ANON_KEY=<sua publishable key>`
+  - `VITE_RUBINOT_BOOSTED_ENDPOINT=https://<seu-worker>/rubinot/boosted` (opcional)
+
+O app usa a [RubinOT Wiki](https://wiki.rubinot.com/pt-BR) como fonte oficial na navegacao e o widget do topo busca boss/monstro boosted em `/rubinot/boosted`. O repositorio ja inclui uma Cloudflare Pages Function nesse caminho; use a variavel `VITE_RUBINOT_BOOSTED_ENDPOINT` apenas se quiser apontar para o Worker separado.
 
 ## Worker de WhatsApp
 
@@ -80,6 +83,8 @@ npm run worker:deploy
 ```
 
 O Worker roda a cada minuto e processa `notification_jobs` pendentes. Ele envia mensagens via `POST /message/sendText/{instance}` da Evolution API.
+
+Ele tambem expõe `GET /rubinot/boosted`, que consulta `https://rubinot.com.br/`, procura o bloco `BoostedBox-module__6IRxPW__body` e devolve o boss e o monstro boosted para o topo do site.
 
 ## Admin
 
