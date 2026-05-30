@@ -36,6 +36,7 @@ export interface BossRecord {
   requires_access: boolean;
   access_url: string;
   location: string;
+  location_url: string;
   recommended_equipment: string;
   cooldown_minutes: number;
   youtube_url: string;

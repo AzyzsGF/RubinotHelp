@@ -18,7 +18,6 @@ import {
   MessageCircle,
   Moon,
   Pencil,
-  Play,
   Plus,
   Save,
   Search,
@@ -73,7 +72,7 @@ import {
   StaminaTarget,
   toStaminaMinutes
 } from "./lib/stamina";
-import { createId, formatDateTime, formatDuration, minutesUntil } from "./lib/time";
+import { createId, formatDateTime, formatDuration, formatTime, minutesUntil } from "./lib/time";
 
 const emptyBossDraft: BossDraft = {
   name: "",
@@ -88,6 +87,7 @@ const emptyBossDraft: BossDraft = {
   requires_access: false,
   access_url: "",
   location: "",
+  location_url: "",
   recommended_equipment: "",
   cooldown_minutes: 20 * 60,
   youtube_url: "",
@@ -325,7 +325,7 @@ export default function App() {
   async function handleDeactivateBoss(id: string) {
     await deactivateBoss(id);
     await refresh();
-    pushToast({ title: "Boss desativado", tone: "info" });
+    pushToast({ title: "Boss ocultado", tone: "info" });
   }
 
   async function handleCancelCheckin(id: string) {
@@ -406,7 +406,12 @@ export default function App() {
               ) : null}
               {view === "stamina" ? <StaminaPanel /> : null}
               {view === "bestiary" ? (
-                <BestiaryPanel bosses={bosses} userSignedIn={Boolean(user)} onCheckIn={handleCheckIn} />
+                <BestiaryPanel
+                  bosses={bosses}
+                  checkins={checkins}
+                  userSignedIn={Boolean(user)}
+                  onCheckIn={handleCheckIn}
+                />
               ) : null}
               {view === "cooldowns" ? (
                 <CooldownsPanel
@@ -858,10 +863,12 @@ function RuleRow({ left, right }: { left: string; right: string }) {
 
 function BestiaryPanel({
   bosses,
+  checkins,
   userSignedIn,
   onCheckIn
 }: {
   bosses: BossRecord[];
+  checkins: BossCheckin[];
   userSignedIn: boolean;
   onCheckIn: (boss: BossRecord) => void;
 }) {
@@ -875,7 +882,7 @@ function BestiaryPanel({
         .map((step) => `${step.name} ${step.location} ${step.mechanics}`)
         .join(" ");
       const text =
-        `${boss.name} ${boss.location} ${boss.access_notes} ${boss.weaknesses.join(" ")} ${boss.damage_types.join(" ")} ${stepText}`.toLowerCase();
+        `${boss.name} ${boss.location} ${boss.weaknesses.join(" ")} ${boss.damage_types.join(" ")} ${stepText}`.toLowerCase();
       return matchesType && text.includes(query.toLowerCase());
     });
   }, [bosses, query, type]);
@@ -913,9 +920,15 @@ function BestiaryPanel({
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 min-[1700px]:grid-cols-5 min-[1920px]:grid-cols-6">
         {filtered.map((boss) => (
-          <BossCard key={boss.id} boss={boss} userSignedIn={userSignedIn} onCheckIn={onCheckIn} />
+          <BossCard
+            key={boss.id}
+            boss={boss}
+            checkins={checkins}
+            userSignedIn={userSignedIn}
+            onCheckIn={onCheckIn}
+          />
         ))}
       </div>
 
@@ -926,16 +939,22 @@ function BestiaryPanel({
 
 function BossCard({
   boss,
+  checkins,
   userSignedIn,
   onCheckIn
 }: {
   boss: BossRecord;
+  checkins: BossCheckin[];
   userSignedIn: boolean;
   onCheckIn: (boss: BossRecord) => void;
 }) {
   const [checkedSteps, setCheckedSteps] = useState<Record<string, boolean>>({});
   const completedSteps = boss.steps.filter((step) => checkedSteps[step.id]).length;
   const allStepsDone = boss.steps.length > 0 && completedSteps === boss.steps.length;
+  const activeCheckin = checkins.find(
+    (checkin) => checkin.boss_id === boss.id && minutesUntil(checkin.cooldown_ends_at) > 0
+  );
+  const remainingMinutes = activeCheckin ? minutesUntil(activeCheckin.cooldown_ends_at) : 0;
 
   useEffect(() => {
     setCheckedSteps({});
@@ -961,32 +980,31 @@ function BossCard({
 
   return (
     <article className="panel overflow-hidden rounded-lg">
-      <img
-        alt={boss.name}
-        className="h-52 w-full object-cover"
-        src={boss.image_url || HERO_IMAGE}
-      />
-      <div className="space-y-4 p-4">
+      <div className="creature-frame mx-auto mt-3 h-[92px] w-[92px]">
+        <img
+          alt={boss.name}
+          className="creature-sprite"
+          src={boss.image_url || HERO_IMAGE}
+        />
+      </div>
+      <div className="space-y-3 p-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-xs font-black uppercase tracking-[0.14em] text-ember">
               {boss.type === "boss" ? "Boss" : "Mini boss"}
             </p>
-            <h3 className="truncate text-xl font-black text-ink">{boss.name}</h3>
+            <h3 className="truncate text-base font-black text-ink">{boss.name}</h3>
           </div>
-          <span className="shrink-0 rounded-full bg-pine px-3 py-1 text-xs font-black text-parchment">
-            {formatDuration(boss.cooldown_minutes)}
-          </span>
-        </div>
-
-        <div className="grid grid-cols-2 gap-2 text-sm md:grid-cols-3">
-          <Metric label="HP" value={boss.hp.toLocaleString("pt-BR")} compact />
-          <Metric label="Mana" value={boss.mana.toLocaleString("pt-BR")} compact />
-          <Metric label="Cooldown" value={formatDuration(boss.cooldown_minutes)} compact />
         </div>
 
         <div className="grid gap-2">
           <InfoPill icon={MapPin} title="Localizacao" value={boss.location || "Localizacao a definir"} />
+          {boss.location_url ? (
+            <a className="btn-secondary min-h-8 justify-center px-3 py-1.5 text-xs" href={boss.location_url} rel="noreferrer" target="_blank">
+              <ExternalLink className="h-3.5 w-3.5" />
+              Abrir localizacao
+            </a>
+          ) : null}
           <div className="rounded-lg border border-ink/10 bg-white/70 p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.12em] text-ink/50">
@@ -1008,9 +1026,6 @@ function BossCard({
             <p className="mt-2 text-sm font-bold text-ink">
               {boss.requires_access ? "Precisa de acesso" : "Nao precisa"}
             </p>
-            {boss.access_notes ? (
-              <p className="mt-1 text-sm leading-6 text-ink/70">{boss.access_notes}</p>
-            ) : null}
           </div>
         </div>
 
@@ -1018,7 +1033,6 @@ function BossCard({
         <TagGroup label="Danos" tags={boss.damage_types} />
 
         <InfoBlock title="Resumo da mecanica" value={boss.mechanics} />
-        <InfoBlock title="Equipamentos" value={boss.recommended_equipment} />
 
         {boss.steps.length > 0 ? (
           <div className="rounded-lg border border-ink/10 bg-white/70 p-3">
@@ -1033,79 +1047,79 @@ function BossCard({
               </button>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-2">
               {boss.steps.map((step, index) => (
                 <div
                   className={clsx(
-                    "grid gap-3 rounded-lg border p-3 transition md:grid-cols-[92px_1fr]",
+                    "grid gap-2 rounded-lg border p-2 transition",
                     checkedSteps[step.id]
                       ? "border-red-500/25 bg-red-50/80"
                       : "border-ink/10 bg-white/75"
                   )}
                   key={step.id}
                 >
-                  <img
-                    alt={step.name}
-                    className="h-24 w-full rounded-lg object-cover md:h-[92px]"
-                    src={step.image_url || boss.image_url || HERO_IMAGE}
-                  />
-                  <div className="min-w-0">
-                    <button
-                      className="flex w-full items-start gap-3 text-left"
-                      onClick={() => toggleStep(step.id)}
-                      type="button"
+                  <button
+                    className="flex w-full items-center gap-2 text-left"
+                    onClick={() => toggleStep(step.id)}
+                    type="button"
+                  >
+                    <span
+                      className={clsx(
+                        "flex h-5 w-5 shrink-0 items-center justify-center rounded border",
+                        checkedSteps[step.id]
+                          ? "border-red-600 bg-red-600 text-white"
+                          : "border-ink/25 bg-white text-transparent"
+                      )}
                     >
-                      <span
-                        className={clsx(
-                          "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border",
-                          checkedSteps[step.id]
-                            ? "border-red-600 bg-red-600 text-white"
-                            : "border-ink/25 bg-white text-transparent"
-                        )}
-                      >
-                        <CheckCircle2 className="h-3.5 w-3.5" />
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block text-sm font-black text-ink">
-                          {index + 1}. {step.name}
-                        </span>
-                        {step.location ? (
-                          <span className="mt-1 block text-xs font-bold uppercase tracking-[0.08em] text-ember">
-                            {step.location}
-                          </span>
-                        ) : null}
-                      </span>
-                    </button>
-                    {step.mechanics ? (
-                      <p className="mt-2 text-sm leading-6 text-ink/70">{step.mechanics}</p>
-                    ) : null}
-                  </div>
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                    </span>
+                    <span className="min-w-0 flex-1 truncate text-sm font-black text-ink">
+                      {index + 1}. {step.name}
+                    </span>
+                    <span className="creature-frame h-9 w-9">
+                      <img
+                        alt=""
+                        className="creature-sprite"
+                        src={step.image_url || boss.image_url || HERO_IMAGE}
+                      />
+                    </span>
+                  </button>
+                  {step.location ? (
+                    <p className="truncate text-xs font-bold uppercase tracking-[0.08em] text-ember">
+                      {step.location}
+                    </p>
+                  ) : null}
+                  {step.mechanics ? (
+                    <p className="line-clamp-2 text-xs leading-5 text-ink/70">{step.mechanics}</p>
+                  ) : null}
                 </div>
               ))}
             </div>
           </div>
         ) : null}
 
+        {activeCheckin ? (
+          <div className="rounded-lg border border-red-500/25 bg-red-50/85 p-3">
+            <p className="text-xs font-black uppercase tracking-[0.12em] text-ember">Em cooldown</p>
+            <p className="mt-1 text-sm font-black text-ink">
+              Volta as {formatTime(activeCheckin.cooldown_ends_at)}
+            </p>
+            <p className="text-xs font-semibold text-ink/60">Falta {formatDuration(remainingMinutes)}</p>
+          </div>
+        ) : null}
+
         <div className="flex flex-wrap gap-2">
           <button
             className="btn-primary"
+            disabled={Boolean(activeCheckin)}
             onClick={() => onCheckIn(boss)}
             title={userSignedIn ? "Iniciar temporizador" : "Entrar para iniciar temporizador"}
             type="button"
           >
             <CheckCircle2 className="h-4 w-4" />
-            Ja fiz
+            {activeCheckin ? "Aguardando" : "Ja fiz"}
           </button>
-          {boss.youtube_url ? (
-            <a className="btn-secondary" href={boss.youtube_url} rel="noreferrer" target="_blank">
-              <Play className="h-4 w-4" />
-              Como chegar
-            </a>
-          ) : null}
         </div>
-        <p className="text-xs font-semibold text-ink/55">
-          O temporizador fica salvo na sua conta; WhatsApp e painel de cooldown usam o horario salvo no banco.
-        </p>
       </div>
     </article>
   );
@@ -1349,7 +1363,10 @@ function AdminPanel({
   const [draft, setDraft] = useState<BossDraft>(emptyBossDraft);
   const [weaknessText, setWeaknessText] = useState("");
   const [damageText, setDamageText] = useState("");
+  const [cooldownUnit, setCooldownUnit] = useState<"hours" | "minutes">("hours");
   const [busy, setBusy] = useState(false);
+  const cooldownValue =
+    cooldownUnit === "hours" ? Number((draft.cooldown_minutes / 60).toFixed(2)) : draft.cooldown_minutes;
 
   if (!isAdmin) {
     return <EmptyState title="Painel admin bloqueado" />;
@@ -1359,6 +1376,21 @@ function AdminPanel({
     setDraft(boss);
     setWeaknessText(joinTags(boss.weaknesses));
     setDamageText(joinTags(boss.damage_types));
+    setCooldownUnit(boss.cooldown_minutes % 60 === 0 ? "hours" : "minutes");
+  }
+
+  function resetDraft() {
+    setDraft(emptyBossDraft);
+    setWeaknessText("");
+    setDamageText("");
+    setCooldownUnit("hours");
+  }
+
+  function updateCooldown(value: string) {
+    const parsed = Number(value);
+    const nextMinutes =
+      cooldownUnit === "hours" ? Math.max(1, Math.round(parsed * 60)) : Math.max(1, Math.round(parsed));
+    setDraft((current) => ({ ...current, cooldown_minutes: Number.isFinite(nextMinutes) ? nextMinutes : 1 }));
   }
 
   async function handleSubmit(event: FormEvent) {
@@ -1369,8 +1401,11 @@ function AdminPanel({
         ...draft,
         weaknesses: splitTags(weaknessText),
         damage_types: splitTags(damageText),
-        hp: Number(draft.hp) || 0,
-        mana: Number(draft.mana) || 0,
+        hp: 0,
+        mana: 0,
+        access_notes: "",
+        recommended_equipment: "",
+        youtube_url: "",
         cooldown_minutes: Number(draft.cooldown_minutes) || 60,
         steps: draft.steps
           .map((step, index) => ({
@@ -1380,9 +1415,7 @@ function AdminPanel({
           }))
           .filter((step) => step.name)
       });
-      setDraft(emptyBossDraft);
-      setWeaknessText("");
-      setDamageText("");
+      resetDraft();
     } finally {
       setBusy(false);
     }
@@ -1446,11 +1479,7 @@ function AdminPanel({
           <h3 className="text-lg font-black text-ink">{draft.id ? "Editar boss" : "Novo boss"}</h3>
           <button
             className="icon-button"
-            onClick={() => {
-              setDraft(emptyBossDraft);
-              setWeaknessText("");
-              setDamageText("");
-            }}
+            onClick={resetDraft}
             title="Limpar formulário"
             type="button"
           >
@@ -1458,18 +1487,20 @@ function AdminPanel({
           </button>
         </div>
 
-        <img
-          alt={draft.name || "Imagem do boss"}
-          className="h-44 w-full rounded-lg object-cover"
-          src={draft.image_url || HERO_IMAGE}
-        />
+        <div className="creature-frame mx-auto h-28 w-28">
+          <img
+            alt={draft.name || "Imagem do boss"}
+            className="creature-sprite"
+            src={draft.image_url || HERO_IMAGE}
+          />
+        </div>
 
-        <Field label="Imagem">
+        <Field label="Imagem GIF/PNG">
           <label className="btn-secondary inline-flex cursor-pointer">
             <Upload className="h-4 w-4" />
             Upload
             <input
-              accept="image/*"
+              accept="image/gif,image/png,image/jpeg,image/webp,image/*"
               className="hidden"
               onChange={(event) => handleUpload(event.target.files?.[0])}
               type="file"
@@ -1498,48 +1529,40 @@ function AdminPanel({
               <option value="mini-boss">Mini boss</option>
             </select>
           </Field>
-          <Field label="HP">
-            <input
-              className="input"
-              min={0}
-              onChange={(event) => setDraft((current) => ({ ...current, hp: Number(event.target.value) }))}
-              type="number"
-              value={draft.hp}
-            />
-          </Field>
-          <Field label="Mana">
-            <input
-              className="input"
-              min={0}
-              onChange={(event) => setDraft((current) => ({ ...current, mana: Number(event.target.value) }))}
-              type="number"
-              value={draft.mana}
-            />
-          </Field>
-          <Field label="Cooldown em minutos">
-            <input
-              className="input"
-              min={1}
-              onChange={(event) =>
-                setDraft((current) => ({ ...current, cooldown_minutes: Number(event.target.value) }))
-              }
-              type="number"
-              value={draft.cooldown_minutes}
-            />
-          </Field>
-          <Field label="YouTube">
-            <input
-              className="input"
-              onChange={(event) => setDraft((current) => ({ ...current, youtube_url: event.target.value }))}
-              type="url"
-              value={draft.youtube_url}
-            />
+          <Field label="Cooldown">
+            <div className="grid grid-cols-[1fr_120px] gap-2">
+              <input
+                className="input"
+                min={cooldownUnit === "hours" ? 0.25 : 1}
+                onChange={(event) => updateCooldown(event.target.value)}
+                step={cooldownUnit === "hours" ? 0.25 : 1}
+                type="number"
+                value={cooldownValue}
+              />
+              <select
+                className="input"
+                onChange={(event) => setCooldownUnit(event.target.value as "hours" | "minutes")}
+                value={cooldownUnit}
+              >
+                <option value="hours">Horas</option>
+                <option value="minutes">Minutos</option>
+              </select>
+            </div>
           </Field>
           <Field label="Localizacao">
             <input
               className="input"
               onChange={(event) => setDraft((current) => ({ ...current, location: event.target.value }))}
               value={draft.location}
+            />
+          </Field>
+          <Field label="Link da localizacao">
+            <input
+              className="input"
+              onChange={(event) => setDraft((current) => ({ ...current, location_url: event.target.value }))}
+              placeholder="https://..."
+              type="url"
+              value={draft.location_url}
             />
           </Field>
           <label className="flex items-center gap-3 rounded-lg border border-ink/10 bg-white/70 px-3 py-3 text-sm font-bold text-ink">
@@ -1580,22 +1603,6 @@ function AdminPanel({
             value={draft.mechanics}
           />
         </Field>
-        <Field label="Observacao de acesso">
-          <textarea
-            className="input min-h-20"
-            onChange={(event) => setDraft((current) => ({ ...current, access_notes: event.target.value }))}
-            value={draft.access_notes}
-          />
-        </Field>
-        <Field label="Equipamentos">
-          <textarea
-            className="input min-h-20"
-            onChange={(event) =>
-              setDraft((current) => ({ ...current, recommended_equipment: event.target.value }))
-            }
-            value={draft.recommended_equipment}
-          />
-        </Field>
 
         <div className="rounded-lg border border-ink/10 bg-white/70 p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1630,11 +1637,13 @@ function AdminPanel({
                   </div>
 
                   <div className="grid gap-3 md:grid-cols-[96px_1fr]">
-                    <img
-                      alt={step.name || `Etapa ${index + 1}`}
-                      className="h-24 w-full rounded-lg object-cover md:h-full"
-                      src={step.image_url || draft.image_url || HERO_IMAGE}
-                    />
+                    <div className="creature-frame h-24 w-24">
+                      <img
+                        alt={step.name || `Etapa ${index + 1}`}
+                        className="creature-sprite"
+                        src={step.image_url || draft.image_url || HERO_IMAGE}
+                      />
+                    </div>
                     <div className="grid gap-3">
                       <div className="grid gap-3 md:grid-cols-2">
                         <Field label="Nome da etapa">
@@ -1665,7 +1674,7 @@ function AdminPanel({
                           <Upload className="h-4 w-4" />
                           Foto da etapa
                           <input
-                            accept="image/*"
+                            accept="image/gif,image/png,image/jpeg,image/webp,image/*"
                             className="hidden"
                             onChange={(event) => handleStepUpload(index, event.target.files?.[0])}
                             type="file"
@@ -1699,7 +1708,7 @@ function AdminPanel({
             onChange={(event) => setDraft((current) => ({ ...current, is_active: event.target.checked }))}
             type="checkbox"
           />
-          Boss ativo
+          Publicado no Boss Tracker
         </label>
 
         <button className="btn-primary" disabled={busy} type="submit">
@@ -1719,18 +1728,20 @@ function AdminPanel({
               )}
               key={boss.id}
             >
-              <img alt={boss.name} className="h-18 h-[72px] w-[72px] rounded-lg object-cover" src={boss.image_url || HERO_IMAGE} />
+              <div className="creature-frame h-[72px] w-[72px]">
+                <img alt={boss.name} className="creature-sprite" src={boss.image_url || HERO_IMAGE} />
+              </div>
               <div className="min-w-0">
                 <p className="truncate font-black text-ink">{boss.name}</p>
                 <p className="text-sm text-ink/65">
-                  {boss.type === "boss" ? "Boss" : "Mini boss"} · {formatDuration(boss.cooldown_minutes)}
+                  {boss.type === "boss" ? "Boss" : "Mini boss"} · cooldown {formatDuration(boss.cooldown_minutes)}
                 </p>
                 <p className="truncate text-xs text-ink/55">
                   {boss.location || "Sem localizacao"} · {boss.requires_access ? "Com acesso" : "Sem acesso"}
                   {boss.steps.length ? ` · ${boss.steps.length} etapas` : ""}
                 </p>
                 <p className="text-xs font-bold uppercase tracking-[0.12em] text-ember">
-                  {boss.is_active ? "Ativo" : "Inativo"}
+                  {boss.is_active ? "Publicado" : "Oculto"}
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -1741,7 +1752,7 @@ function AdminPanel({
                   className="icon-button"
                   disabled={!boss.is_active}
                   onClick={() => onDeactivate(boss.id)}
-                  title="Desativar"
+                  title="Ocultar do Boss Tracker"
                   type="button"
                 >
                   <Trash2 className="h-4 w-4" />

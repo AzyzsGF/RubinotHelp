@@ -127,6 +127,7 @@ function mapBoss(row: Record<string, unknown>): BossRecord {
     requires_access: Boolean(row.requires_access),
     access_url: String(row.access_url ?? ""),
     location: String(row.location ?? ""),
+    location_url: String(row.location_url ?? row.youtube_url ?? ""),
     recommended_equipment: String(row.recommended_equipment ?? ""),
     cooldown_minutes: Number(row.cooldown_minutes ?? 0),
     youtube_url: String(row.youtube_url ?? ""),
@@ -370,9 +371,10 @@ export async function saveBoss(draft: BossDraft) {
     requires_access: draft.requires_access,
     access_url: draft.requires_access ? draft.access_url : "",
     location: draft.location,
+    location_url: draft.location_url,
     recommended_equipment: draft.recommended_equipment,
     cooldown_minutes: draft.cooldown_minutes,
-    youtube_url: draft.youtube_url,
+    youtube_url: "",
     is_active: draft.is_active
   };
 

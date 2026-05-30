@@ -22,6 +22,7 @@ export function createDemoBosses(): BossRecord[] {
       requires_access: true,
       access_url: "https://rubinot.com.br/serverinfo",
       location: "Tumba profunda, rota leste do deserto.",
+      location_url: "https://rubinot.com.br/serverinfo",
       recommended_equipment:
         "Proteção de terra, set com defesa física alta, runas de área e imbuements defensivos.",
       cooldown_minutes: 20 * 60,
@@ -62,6 +63,7 @@ export function createDemoBosses(): BossRecord[] {
       requires_access: false,
       access_url: "",
       location: "Rota gelada, corredor norte.",
+      location_url: "",
       recommended_equipment: "Proteção de gelo, might rings e dano de fogo para acelerar a luta.",
       cooldown_minutes: 8 * 60,
       youtube_url: "",

@@ -16,6 +16,14 @@ export function formatDateTime(value: string | Date) {
   }).format(date);
 }
 
+export function formatTime(value: string | Date) {
+  const date = typeof value === "string" ? new Date(value) : value;
+  return new Intl.DateTimeFormat("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(date);
+}
+
 export function formatDuration(totalMinutes: number) {
   const minutes = Math.max(0, Math.round(totalMinutes));
   const days = Math.floor(minutes / 1440);
