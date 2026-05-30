@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "tsc && vite build",
-    "preview": "vite preview --host 0.0.0.0",
+    "preview": "npm run build && wrangler dev",
     "test": "vitest run",
     "test:watch": "vitest",
     "supabase:login": "supabase login",
@@ -14,7 +14,8 @@
     "supabase:db:push": "node scripts/supabase-db-push.mjs",
     "supabase:db:push:linked": "supabase db push",
     "worker:dev": "wrangler dev -c worker/wrangler.toml",
-    "worker:deploy": "wrangler deploy -c worker/wrangler.toml"
+    "worker:deploy": "wrangler deploy -c worker/wrangler.toml",
+    "deploy": "npm run build && wrangler deploy"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
@@ -24,6 +25,7 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.39.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.7.0",
@@ -34,6 +36,6 @@
     "typescript": "^5.7.2",
     "vite": "^6.4.2",
     "vitest": "^3.2.4",
-    "wrangler": "^4.20.0"
+    "wrangler": "^4.95.0"
   }
 }
