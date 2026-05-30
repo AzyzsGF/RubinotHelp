@@ -13,6 +13,7 @@ export function createDemoBosses(): BossRecord[] {
       full_name: "Ancient Scarab King",
       popular_name: "Scarab King",
       display_name_mode: "full",
+      content_mode: "group",
       type: "boss",
       image_url: HERO_IMAGE,
       hp: 185000,
@@ -38,6 +39,8 @@ export function createDemoBosses(): BossRecord[] {
           name: "Entrada da tumba",
           image_url: HERO_IMAGE,
           location: "Descer pela rota principal da tumba.",
+          weaknesses: ["Gelo"],
+          damage_types: ["Terra"],
           mechanics: "Limpar as waves antes de puxar o boss para evitar stack de summons."
         },
         {
@@ -46,6 +49,8 @@ export function createDemoBosses(): BossRecord[] {
           name: "Ancient Scarab King",
           image_url: HERO_IMAGE,
           location: "Sala final.",
+          weaknesses: ["Gelo", "Sagrado"],
+          damage_types: ["Terra", "Fisico"],
           mechanics: "Manter distância das explosões centrais e trocar de alvo nos summons."
         }
       ],
@@ -58,6 +63,7 @@ export function createDemoBosses(): BossRecord[] {
       full_name: "Frost Herald",
       popular_name: "Herald",
       display_name_mode: "full",
+      content_mode: "single",
       type: "mini-boss",
       image_url: HERO_IMAGE,
       hp: 72000,

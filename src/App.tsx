@@ -8,6 +8,8 @@ import {
   CheckCircle2,
   Clock3,
   Dumbbell,
+  Eye,
+  EyeOff,
   ExternalLink,
   Gavel,
   LayoutDashboard,
@@ -45,12 +47,13 @@ import {
 import {
   cancelCheckin,
   createBossCheckin,
-  deactivateBoss,
+  deleteBoss,
   getAuthState,
   listBosses,
   listUserCheckins,
   markBrowserNotified,
   saveBoss,
+  setBossPublished,
   signIn,
   signOut,
   signUp,
@@ -80,6 +83,7 @@ const emptyBossDraft: BossDraft = {
   full_name: "",
   popular_name: "",
   display_name_mode: "full",
+  content_mode: "single",
   type: "boss",
   image_url: HERO_IMAGE,
   hp: 0,
@@ -156,6 +160,54 @@ function splitTags(value: string) {
 
 function joinTags(value: string[]) {
   return value.join(", ");
+}
+
+function createBossStep(sortOrder: number): BossDraft["steps"][number] {
+  return {
+    id: createId("step"),
+    sort_order: sortOrder,
+    name: "",
+    image_url: "",
+    location: "",
+    weaknesses: [],
+    damage_types: [],
+    mechanics: ""
+  };
+}
+
+function normalizeBossStep(step: Partial<BossDraft["steps"][number]>, index: number): BossDraft["steps"][number] {
+  return {
+    id: step.id ?? createId("step"),
+    boss_id: step.boss_id,
+    sort_order: index,
+    name: step.name ?? "",
+    image_url: step.image_url ?? "",
+    location: step.location ?? "",
+    weaknesses: step.weaknesses ?? [],
+    damage_types: step.damage_types ?? [],
+    mechanics: step.mechanics ?? "",
+    created_at: step.created_at,
+    updated_at: step.updated_at
+  };
+}
+
+function resizeBossSteps(steps: BossDraft["steps"], count: number) {
+  const safeCount = Math.max(1, Math.min(20, Math.round(count) || 1));
+  const next = steps.slice(0, safeCount).map((step, index) => normalizeBossStep(step, index));
+
+  while (next.length < safeCount) {
+    next.push(createBossStep(next.length));
+  }
+
+  return next;
+}
+
+function bossKindLabel(boss: BossRecord) {
+  if (boss.content_mode === "group") {
+    return "Grupo";
+  }
+
+  return boss.type === "boss" ? "Boss" : "Mini boss";
 }
 
 function playAlertTone() {
@@ -328,10 +380,22 @@ export default function App() {
     pushToast({ title: "Boss salvo", detail: saved.name, tone: "success" });
   }
 
-  async function handleDeactivateBoss(id: string) {
-    await deactivateBoss(id);
+  async function handleBossPublished(id: string, isActive: boolean) {
+    await setBossPublished(id, isActive);
     await refresh();
-    pushToast({ title: "Boss ocultado", tone: "info" });
+    pushToast({ title: isActive ? "Boss publicado" : "Boss ocultado", tone: "info" });
+  }
+
+  async function handleBossDelete(id: string) {
+    const boss = bosses.find((item) => item.id === id);
+    const confirmed = window.confirm(`Excluir ${boss?.name ?? "este boss"} do catalogo?`);
+    if (!confirmed) {
+      return;
+    }
+
+    await deleteBoss(id);
+    await refresh();
+    pushToast({ title: "Boss excluido do catalogo", tone: "info" });
   }
 
   async function handleCancelCheckin(id: string) {
@@ -444,7 +508,8 @@ export default function App() {
                   bosses={bosses}
                   isAdmin={Boolean(profile?.is_admin)}
                   onSave={handleBossSave}
-                  onDeactivate={handleDeactivateBoss}
+                  onDelete={handleBossDelete}
+                  onSetPublished={handleBossPublished}
                 />
               ) : null}
             </>
@@ -891,7 +956,10 @@ function BossTrackerPanel({
     return bosses.filter((boss) => {
       const matchesType = type === "all" || boss.type === type;
       const stepText = boss.steps
-        .map((step) => `${step.name} ${step.location} ${step.mechanics}`)
+        .map(
+          (step) =>
+            `${step.name} ${step.location} ${step.mechanics} ${step.weaknesses.join(" ")} ${step.damage_types.join(" ")}`
+        )
         .join(" ");
       const text =
         `${boss.name} ${boss.full_name} ${boss.popular_name} ${boss.location} ${boss.weaknesses.join(" ")} ${boss.damage_types.join(" ")} ${stepText}`.toLowerCase();
@@ -1001,7 +1069,7 @@ function BossCard({
         </div>
         <div className="min-w-0 flex-1">
           <p className="text-[10px] font-black uppercase tracking-[0.14em] text-ember">
-            {boss.type === "boss" ? "Boss" : "Mini boss"}
+            {bossKindLabel(boss)}
           </p>
           <h3 className="line-clamp-2 min-h-[2.35rem] break-words text-base font-black leading-[1.15] text-ink">
             {boss.name}
@@ -1130,7 +1198,7 @@ function BossInfoModal({
             <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-xs font-black uppercase tracking-[0.14em] text-ember">
-              {boss.type === "boss" ? "Boss" : "Mini boss"}
+              {bossKindLabel(boss)}
             </p>
             <h3 className="truncate text-base font-black text-ink">{boss.name}</h3>
           </div>
@@ -1168,17 +1236,20 @@ function BossInfoModal({
           </div>
         </div>
 
-        <TagGroup label="Fraquezas" tags={boss.weaknesses} />
-        <TagGroup label="Danos" tags={boss.damage_types} />
-
-        <InfoBlock title="Resumo da mecanica" value={boss.mechanics} />
+        {boss.content_mode === "single" ? (
+          <>
+            <TagGroup label="Fraquezas" tags={boss.weaknesses} />
+            <TagGroup label="Danos" tags={boss.damage_types} />
+            <InfoBlock title="Resumo da mecanica" value={boss.mechanics} />
+          </>
+        ) : null}
 
         {boss.steps.length > 0 ? (
           <div className="rounded-lg border border-ink/10 bg-white/70 p-3">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <p className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.12em] text-ink/50">
                 <ListChecks className="h-4 w-4 text-ember" />
-                Checklist {completedSteps}/{boss.steps.length}
+                {boss.content_mode === "group" ? "Bosses do grupo" : "Checklist"} {completedSteps}/{boss.steps.length}
               </p>
               <button className="btn-secondary min-h-8 px-3 py-1.5 text-xs" onClick={markAllSteps} type="button">
                 <CheckCircle2 className="h-3.5 w-3.5" />
@@ -1227,6 +1298,20 @@ function BossInfoModal({
                     <p className="truncate text-xs font-bold uppercase tracking-[0.08em] text-ember">
                       {step.location}
                     </p>
+                  ) : null}
+                  {step.weaknesses.length > 0 || step.damage_types.length > 0 ? (
+                    <div className="flex flex-wrap gap-1">
+                      {step.weaknesses.map((tag) => (
+                        <span className="rounded-full bg-red-500/10 px-2 py-0.5 text-[10px] font-black text-ember" key={`weak-${step.id}-${tag}`}>
+                          Fraq: {tag}
+                        </span>
+                      ))}
+                      {step.damage_types.map((tag) => (
+                        <span className="rounded-full bg-ink/10 px-2 py-0.5 text-[10px] font-black text-ink/65" key={`dmg-${step.id}-${tag}`}>
+                          Dano: {tag}
+                        </span>
+                      ))}
+                    </div>
                   ) : null}
                   {step.mechanics ? (
                     <p className="line-clamp-2 text-xs leading-5 text-ink/70">{step.mechanics}</p>
@@ -1572,12 +1657,14 @@ function AdminPanel({
   bosses,
   isAdmin,
   onSave,
-  onDeactivate
+  onDelete,
+  onSetPublished
 }: {
   bosses: BossRecord[];
   isAdmin: boolean;
   onSave: (draft: BossDraft) => Promise<void>;
-  onDeactivate: (id: string) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
+  onSetPublished: (id: string, isActive: boolean) => Promise<void>;
 }) {
   const [draft, setDraft] = useState<BossDraft>(emptyBossDraft);
   const [weaknessText, setWeaknessText] = useState("");
@@ -1592,17 +1679,40 @@ function AdminPanel({
   }
 
   function editBoss(boss: BossRecord) {
-    setDraft(boss);
+    const contentMode = boss.content_mode === "group" || boss.steps.length > 0 ? "group" : "single";
+    const steps = boss.steps.map((step, index) => normalizeBossStep(step, index));
+    setDraft({
+      ...boss,
+      content_mode: contentMode,
+      steps: contentMode === "group" ? resizeBossSteps(steps, Math.max(1, steps.length)) : steps
+    });
     setWeaknessText(joinTags(boss.weaknesses));
     setDamageText(joinTags(boss.damage_types));
     setCooldownUnit(boss.cooldown_minutes % 60 === 0 ? "hours" : "minutes");
   }
 
   function resetDraft() {
-    setDraft(emptyBossDraft);
+    setDraft({ ...emptyBossDraft, steps: [] });
     setWeaknessText("");
     setDamageText("");
     setCooldownUnit("hours");
+  }
+
+  function setContentMode(contentMode: BossDraft["content_mode"]) {
+    setDraft((current) => ({
+      ...current,
+      content_mode: contentMode,
+      steps: contentMode === "group" ? resizeBossSteps(current.steps, Math.max(1, current.steps.length)) : current.steps
+    }));
+  }
+
+  function updateGroupCount(value: string) {
+    const parsed = Number(value);
+    setDraft((current) => ({
+      ...current,
+      content_mode: "group",
+      steps: resizeBossSteps(current.steps, Number.isFinite(parsed) ? parsed : 1)
+    }));
   }
 
   function updateCooldown(value: string) {
@@ -1616,23 +1726,27 @@ function AdminPanel({
     event.preventDefault();
     setBusy(true);
     try {
+      const isGroup = draft.content_mode === "group";
       await onSave({
         ...draft,
-        weaknesses: splitTags(weaknessText),
-        damage_types: splitTags(damageText),
+        content_mode: draft.content_mode,
+        weaknesses: isGroup ? [] : splitTags(weaknessText),
+        damage_types: isGroup ? [] : splitTags(damageText),
         hp: 0,
         mana: 0,
+        mechanics: isGroup ? "" : draft.mechanics,
         access_notes: "",
         recommended_equipment: "",
         youtube_url: "",
         cooldown_minutes: Number(draft.cooldown_minutes) || 60,
-        steps: draft.steps
-          .map((step, index) => ({
-            ...step,
-            sort_order: index,
-            name: step.name.trim()
-          }))
-          .filter((step) => step.name)
+        steps: isGroup
+          ? draft.steps
+              .map((step, index) => ({
+                ...normalizeBossStep(step, index),
+                name: step.name.trim()
+              }))
+              .filter((step) => step.name)
+          : []
       });
       resetDraft();
     } finally {
@@ -1658,30 +1772,6 @@ function AdminPanel({
     }));
   }
 
-  function addStep() {
-    setDraft((current) => ({
-      ...current,
-      steps: [
-        ...current.steps,
-        {
-          id: createId("step"),
-          sort_order: current.steps.length,
-          name: "",
-          image_url: "",
-          location: "",
-          mechanics: ""
-        }
-      ]
-    }));
-  }
-
-  function removeStep(index: number) {
-    setDraft((current) => ({
-      ...current,
-      steps: current.steps.filter((_, itemIndex) => itemIndex !== index)
-    }));
-  }
-
   async function handleStepUpload(index: number, file: File | undefined) {
     if (!file) {
       return;
@@ -1704,6 +1794,36 @@ function AdminPanel({
           >
             <Plus className="h-4 w-4" />
           </button>
+        </div>
+
+        <div className="rounded-lg border border-ink/10 bg-white/70 p-3">
+          <p className="text-xs font-black uppercase tracking-[0.12em] text-ink/60">Formato do card</p>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <button
+              className={clsx(
+                "rounded-md border px-3 py-2 text-sm font-black transition",
+                draft.content_mode === "single"
+                  ? "border-ember bg-red-500 text-white"
+                  : "border-ink/10 bg-white text-ink hover:bg-red-50"
+              )}
+              onClick={() => setContentMode("single")}
+              type="button"
+            >
+              1 boss
+            </button>
+            <button
+              className={clsx(
+                "rounded-md border px-3 py-2 text-sm font-black transition",
+                draft.content_mode === "group"
+                  ? "border-ember bg-red-500 text-white"
+                  : "border-ink/10 bg-white text-ink hover:bg-red-50"
+              )}
+              onClick={() => setContentMode("group")}
+              type="button"
+            >
+              Grupo de bosses
+            </button>
+          </div>
         </div>
 
         <div className="creature-frame mx-auto h-28 w-28">
@@ -1862,71 +1982,70 @@ function AdminPanel({
           </Field>
         ) : null}
 
-        <Field label="Fraquezas">
-          <input className="input" onChange={(event) => setWeaknessText(event.target.value)} value={weaknessText} />
-        </Field>
-        <Field label="Danos">
-          <input className="input" onChange={(event) => setDamageText(event.target.value)} value={damageText} />
-        </Field>
-        <Field label="Resumo da mecanica">
-          <textarea
-            className="input min-h-24"
-            onChange={(event) => setDraft((current) => ({ ...current, mechanics: event.target.value }))}
-            value={draft.mechanics}
-          />
-        </Field>
-
-        <div className="rounded-lg border border-ink/10 bg-white/70 p-4">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <p className="text-sm font-black text-ink">Etapas/checklist</p>
-              <p className="text-xs font-semibold text-ink/55">
-                Use para GT, bosses em sequencia ou mini bosses dentro do mesmo tracker.
-              </p>
+        {draft.content_mode === "single" ? (
+          <>
+            <Field label="Fraquezas">
+              <input className="input" onChange={(event) => setWeaknessText(event.target.value)} value={weaknessText} />
+            </Field>
+            <Field label="Danos">
+              <input className="input" onChange={(event) => setDamageText(event.target.value)} value={damageText} />
+            </Field>
+            <Field label="Resumo da mecanica">
+              <textarea
+                className="input min-h-24"
+                onChange={(event) => setDraft((current) => ({ ...current, mechanics: event.target.value }))}
+                value={draft.mechanics}
+              />
+            </Field>
+          </>
+        ) : (
+          <div className="rounded-lg border border-ink/10 bg-white/70 p-4">
+            <div className="grid gap-3 md:grid-cols-[1fr_150px] md:items-end">
+              <div>
+                <p className="text-sm font-black text-ink">Bosses do grupo</p>
+                <p className="text-xs font-semibold text-ink/55">
+                  Cada card abaixo vira um boss interno do grupo, com informacoes proprias.
+                </p>
+              </div>
+              <Field label="Quantidade">
+                <input
+                  className="input"
+                  max={20}
+                  min={1}
+                  onChange={(event) => updateGroupCount(event.target.value)}
+                  type="number"
+                  value={Math.max(1, draft.steps.length)}
+                />
+              </Field>
             </div>
-            <button className="btn-secondary min-h-9 px-3 py-1.5 text-xs" onClick={addStep} type="button">
-              <Plus className="h-3.5 w-3.5" />
-              Adicionar etapa
-            </button>
-          </div>
 
-          {draft.steps.length > 0 ? (
             <div className="mt-4 space-y-4">
               {draft.steps.map((step, index) => (
                 <div className="rounded-lg border border-ink/10 bg-white p-3" key={step.id}>
-                  <div className="mb-3 flex items-center justify-between gap-2">
-                    <p className="text-xs font-black uppercase tracking-[0.12em] text-ink/50">
-                      Etapa {index + 1}
-                    </p>
-                    <button
-                      className="icon-button"
-                      onClick={() => removeStep(index)}
-                      title="Remover etapa"
-                      type="button"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
+                  <p className="mb-3 text-xs font-black uppercase tracking-[0.12em] text-ink/50">
+                    Boss {index + 1}
+                  </p>
 
                   <div className="grid gap-3 md:grid-cols-[96px_1fr]">
                     <div className="creature-frame h-24 w-24">
                       <img
-                        alt={step.name || `Etapa ${index + 1}`}
+                        alt={step.name || `Boss ${index + 1}`}
                         className="creature-sprite"
                         src={step.image_url || draft.image_url || HERO_IMAGE}
                       />
                     </div>
                     <div className="grid gap-3">
                       <div className="grid gap-3 md:grid-cols-2">
-                        <Field label="Nome da etapa">
+                        <Field label="Nome do boss">
                           <input
                             className="input"
                             onChange={(event) => updateStep(index, { name: event.target.value })}
-                            placeholder="GT 1, GT 2, Last GT..."
+                            placeholder="GT 1, Last GT..."
+                            required
                             value={step.name}
                           />
                         </Field>
-                        <Field label="Localizacao da etapa">
+                        <Field label="Localizacao do boss">
                           <input
                             className="input"
                             onChange={(event) => updateStep(index, { location: event.target.value })}
@@ -1934,7 +2053,23 @@ function AdminPanel({
                           />
                         </Field>
                       </div>
-                      <Field label="Resumo/mecanica da etapa">
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <Field label="Fraquezas">
+                          <input
+                            className="input"
+                            onChange={(event) => updateStep(index, { weaknesses: splitTags(event.target.value) })}
+                            value={joinTags(step.weaknesses)}
+                          />
+                        </Field>
+                        <Field label="Danos">
+                          <input
+                            className="input"
+                            onChange={(event) => updateStep(index, { damage_types: splitTags(event.target.value) })}
+                            value={joinTags(step.damage_types)}
+                          />
+                        </Field>
+                      </div>
+                      <Field label="Resumo/mecanica do boss">
                         <textarea
                           className="input min-h-20"
                           onChange={(event) => updateStep(index, { mechanics: event.target.value })}
@@ -1944,7 +2079,7 @@ function AdminPanel({
                       <div className="flex flex-wrap gap-2">
                         <label className="btn-secondary inline-flex cursor-pointer">
                           <Upload className="h-4 w-4" />
-                          Foto da etapa
+                          Foto do boss
                           <input
                             accept="image/gif,image/png,image/jpeg,image/webp,image/*"
                             className="hidden"
@@ -1966,12 +2101,8 @@ function AdminPanel({
                 </div>
               ))}
             </div>
-          ) : (
-            <p className="mt-4 rounded-lg border border-dashed border-ink/15 bg-white/60 px-3 py-3 text-sm font-semibold text-ink/60">
-              Sem etapas ainda. Para GT, adicione 5 bosses e uma etapa "Last GT"; no card o player marca cada uma ou todas de vez.
-            </p>
-          )}
-        </div>
+          </div>
+        )}
 
         <label className="flex items-center gap-3 rounded-lg border border-ink/10 bg-white/70 px-3 py-3 text-sm font-bold text-ink">
           <input
@@ -2006,11 +2137,11 @@ function AdminPanel({
               <div className="min-w-0">
                 <p className="truncate font-black text-ink">{boss.name}</p>
                 <p className="text-sm text-ink/65">
-                  {boss.type === "boss" ? "Boss" : "Mini boss"} · cooldown {formatDuration(boss.cooldown_minutes)}
+                  {bossKindLabel(boss)} · cooldown {formatDuration(boss.cooldown_minutes)}
                 </p>
                 <p className="truncate text-xs text-ink/55">
                   {boss.location || "Sem localizacao"} · {boss.requires_access ? "Com acesso" : "Sem acesso"}
-                  {boss.steps.length ? ` · ${boss.steps.length} etapas` : ""}
+                  {boss.content_mode === "group" && boss.steps.length ? ` · ${boss.steps.length} bosses` : ""}
                 </p>
                 <p className="text-xs font-bold uppercase tracking-[0.12em] text-ember">
                   {boss.is_active ? "Publicado" : "Oculto"}
@@ -2022,9 +2153,16 @@ function AdminPanel({
                 </button>
                 <button
                   className="icon-button"
-                  disabled={!boss.is_active}
-                  onClick={() => onDeactivate(boss.id)}
-                  title="Ocultar do Boss Tracker"
+                  onClick={() => onSetPublished(boss.id, !boss.is_active)}
+                  title={boss.is_active ? "Ocultar do Boss Tracker" : "Publicar no Boss Tracker"}
+                  type="button"
+                >
+                  {boss.is_active ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+                <button
+                  className="icon-button"
+                  onClick={() => onDelete(boss.id)}
+                  title="Excluir do catalogo"
                   type="button"
                 >
                   <Trash2 className="h-4 w-4" />

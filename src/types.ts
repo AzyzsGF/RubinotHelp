@@ -12,6 +12,8 @@ export type BossType = "boss" | "mini-boss";
 
 export type BossDisplayNameMode = "full" | "popular";
 
+export type BossContentMode = "single" | "group";
+
 export type Channel = "whatsapp";
 
 export type JobStatus = "pending" | "sent" | "failed" | "skipped";
@@ -38,6 +40,7 @@ export interface BossRecord {
   full_name: string;
   popular_name: string;
   display_name_mode: BossDisplayNameMode;
+  content_mode: BossContentMode;
   type: BossType;
   image_url: string;
   hp: number;
@@ -70,6 +73,8 @@ export interface BossStep {
   name: string;
   image_url: string;
   location: string;
+  weaknesses: string[];
+  damage_types: string[];
   mechanics: string;
   created_at?: string;
   updated_at?: string;

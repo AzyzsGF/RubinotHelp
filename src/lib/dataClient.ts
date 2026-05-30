@@ -2,6 +2,7 @@ import {
   AppUser,
   AuthState,
   BossCheckin,
+  BossContentMode,
   BossDisplayNameMode,
   BossDraft,
   BossRecord,
@@ -102,6 +103,8 @@ function mapBossStep(row: Record<string, unknown>, index = 0): BossStep {
     name: String(row.name ?? ""),
     image_url: String(row.image_url ?? ""),
     location: String(row.location ?? ""),
+    weaknesses: normalizeList(row.weaknesses as string[]),
+    damage_types: normalizeList(row.damage_types as string[]),
     mechanics: String(row.mechanics ?? ""),
     created_at: row.created_at ? String(row.created_at) : undefined,
     updated_at: row.updated_at ? String(row.updated_at) : undefined
@@ -117,6 +120,7 @@ function mapBoss(row: Record<string, unknown>): BossRecord {
   const fullName = String(row.full_name ?? legacyName);
   const popularName = String(row.popular_name ?? "");
   const displayNameMode: BossDisplayNameMode = row.display_name_mode === "popular" ? "popular" : "full";
+  const contentMode: BossContentMode = row.content_mode === "group" || steps.length > 0 ? "group" : "single";
   const displayName =
     displayNameMode === "popular"
       ? popularName || fullName || legacyName
@@ -128,6 +132,7 @@ function mapBoss(row: Record<string, unknown>): BossRecord {
     full_name: fullName,
     popular_name: popularName,
     display_name_mode: displayNameMode,
+    content_mode: contentMode,
     type: row.type === "mini-boss" ? "mini-boss" : "boss",
     image_url: String(row.image_url ?? ""),
     hp: Number(row.hp ?? 0),
@@ -373,6 +378,7 @@ export async function saveBoss(draft: BossDraft) {
   const fullName = draft.full_name.trim() || draft.name.trim();
   const popularName = draft.popular_name.trim();
   const displayNameMode: BossDisplayNameMode = draft.display_name_mode === "popular" ? "popular" : "full";
+  const contentMode: BossContentMode = draft.content_mode === "group" ? "group" : "single";
   const displayName =
     displayNameMode === "popular" ? popularName || fullName : fullName || popularName;
   const payload = {
@@ -380,6 +386,7 @@ export async function saveBoss(draft: BossDraft) {
     full_name: fullName,
     popular_name: popularName,
     display_name_mode: displayNameMode,
+    content_mode: contentMode,
     type: draft.type,
     image_url: draft.image_url,
     hp: draft.hp,
@@ -405,13 +412,23 @@ export async function saveBoss(draft: BossDraft) {
           ...(bosses.find((item) => item.id === draft.id) as BossRecord),
           ...payload,
           id: draft.id,
-          steps: draft.steps.map((step, index) => ({ ...step, sort_order: index })),
+          steps: draft.steps.map((step, index) => ({
+            ...step,
+            weaknesses: step.weaknesses ?? [],
+            damage_types: step.damage_types ?? [],
+            sort_order: index
+          })),
           updated_at: now
         }
       : {
           ...payload,
           id: createId("boss"),
-          steps: draft.steps.map((step, index) => ({ ...step, sort_order: index })),
+          steps: draft.steps.map((step, index) => ({
+            ...step,
+            weaknesses: step.weaknesses ?? [],
+            damage_types: step.damage_types ?? [],
+            sort_order: index
+          })),
           created_at: now,
           updated_at: now
         };
@@ -437,6 +454,8 @@ export async function saveBoss(draft: BossDraft) {
       name: step.name.trim(),
       image_url: step.image_url,
       location: step.location,
+      weaknesses: step.weaknesses ?? [],
+      damage_types: step.damage_types ?? [],
       mechanics: step.mechanics
     }))
     .filter((step) => step.name);
@@ -462,6 +481,8 @@ export async function saveBoss(draft: BossDraft) {
       name: step.name,
       image_url: step.image_url,
       location: step.location,
+      weaknesses: step.weaknesses,
+      damage_types: step.damage_types,
       mechanics: step.mechanics
     }))
   };
@@ -478,6 +499,41 @@ export async function deactivateBoss(id: string) {
   }
 
   const { error } = await supabase.from("bosses").update({ is_active: false }).eq("id", id);
+  if (error) {
+    throw error;
+  }
+}
+
+export async function setBossPublished(id: string, isActive: boolean) {
+  if (!supabase) {
+    setLocalBosses(
+      getLocalBosses().map((boss) =>
+        boss.id === id ? { ...boss, is_active: isActive, updated_at: nowIso() } : boss
+      )
+    );
+    return;
+  }
+
+  const { error } = await supabase.from("bosses").update({ is_active: isActive }).eq("id", id);
+  if (error) {
+    throw error;
+  }
+}
+
+export async function deleteBoss(id: string) {
+  if (!supabase) {
+    const removedCheckins = getLocalCheckins().filter((checkin) => checkin.boss_id === id).map((checkin) => checkin.id);
+    setLocalBosses(getLocalBosses().filter((boss) => boss.id !== id));
+    setLocalCheckins(getLocalCheckins().filter((checkin) => checkin.boss_id !== id));
+    const jobs = readLocal<Record<string, unknown>[]>(LOCAL_KEYS.jobs, []);
+    writeLocal(
+      LOCAL_KEYS.jobs,
+      jobs.filter((job) => !removedCheckins.includes(String(job.checkin_id)))
+    );
+    return;
+  }
+
+  const { error } = await supabase.from("bosses").delete().eq("id", id);
   if (error) {
     throw error;
   }
