@@ -4,6 +4,7 @@ import {
   BossCheckin,
   BossDraft,
   BossRecord,
+  BossStep,
   Profile
 } from "../types";
 import { createDemoBosses } from "./demoData";
@@ -56,9 +57,9 @@ function setLocalProfiles(profiles: Profile[]) {
 }
 
 function getLocalBosses() {
-  const bosses = readLocal<BossRecord[]>(LOCAL_KEYS.bosses, []);
+  const bosses = readLocal<Record<string, unknown>[]>(LOCAL_KEYS.bosses, []);
   if (bosses.length > 0) {
-    return bosses;
+    return bosses.map((boss) => mapBoss(boss));
   }
 
   const seeded = createDemoBosses();
@@ -92,7 +93,26 @@ function normalizeList(value: string[] | null | undefined) {
   return Array.isArray(value) ? value.filter(Boolean) : [];
 }
 
+function mapBossStep(row: Record<string, unknown>, index = 0): BossStep {
+  return {
+    id: String(row.id ?? createId("step")),
+    boss_id: row.boss_id ? String(row.boss_id) : undefined,
+    sort_order: Number(row.sort_order ?? index),
+    name: String(row.name ?? ""),
+    image_url: String(row.image_url ?? ""),
+    location: String(row.location ?? ""),
+    mechanics: String(row.mechanics ?? ""),
+    created_at: row.created_at ? String(row.created_at) : undefined,
+    updated_at: row.updated_at ? String(row.updated_at) : undefined
+  };
+}
+
 function mapBoss(row: Record<string, unknown>): BossRecord {
+  const rawSteps = (row.steps ?? row.boss_steps) as Record<string, unknown>[] | null | undefined;
+  const steps = Array.isArray(rawSteps)
+    ? rawSteps.map((step, index) => mapBossStep(step, index)).sort((a, b) => a.sort_order - b.sort_order)
+    : [];
+
   return {
     id: String(row.id),
     name: String(row.name ?? ""),
@@ -104,10 +124,14 @@ function mapBoss(row: Record<string, unknown>): BossRecord {
     damage_types: normalizeList(row.damage_types as string[]),
     mechanics: String(row.mechanics ?? ""),
     access_notes: String(row.access_notes ?? ""),
+    requires_access: Boolean(row.requires_access),
+    access_url: String(row.access_url ?? ""),
+    location: String(row.location ?? ""),
     recommended_equipment: String(row.recommended_equipment ?? ""),
     cooldown_minutes: Number(row.cooldown_minutes ?? 0),
     youtube_url: String(row.youtube_url ?? ""),
     is_active: Boolean(row.is_active),
+    steps,
     created_at: String(row.created_at ?? nowIso()),
     updated_at: String(row.updated_at ?? nowIso())
   };
@@ -314,7 +338,11 @@ export async function listBosses(includeInactive = false) {
       .sort((a, b) => a.name.localeCompare(b.name));
   }
 
-  let query = supabase.from("bosses").select("*").order("name", { ascending: true });
+  let query = supabase
+    .from("bosses")
+    .select("*, steps:boss_steps(*)")
+    .order("name", { ascending: true })
+    .order("sort_order", { referencedTable: "boss_steps", ascending: true });
   if (!includeInactive) {
     query = query.eq("is_active", true);
   }
@@ -339,6 +367,9 @@ export async function saveBoss(draft: BossDraft) {
     damage_types: draft.damage_types,
     mechanics: draft.mechanics,
     access_notes: draft.access_notes,
+    requires_access: draft.requires_access,
+    access_url: draft.requires_access ? draft.access_url : "",
+    location: draft.location,
     recommended_equipment: draft.recommended_equipment,
     cooldown_minutes: draft.cooldown_minutes,
     youtube_url: draft.youtube_url,
@@ -352,11 +383,13 @@ export async function saveBoss(draft: BossDraft) {
           ...(bosses.find((item) => item.id === draft.id) as BossRecord),
           ...payload,
           id: draft.id,
+          steps: draft.steps.map((step, index) => ({ ...step, sort_order: index })),
           updated_at: now
         }
       : {
           ...payload,
           id: createId("boss"),
+          steps: draft.steps.map((step, index) => ({ ...step, sort_order: index })),
           created_at: now,
           updated_at: now
         };
@@ -374,7 +407,42 @@ export async function saveBoss(draft: BossDraft) {
     throw error;
   }
 
-  return mapBoss(data as Record<string, unknown>);
+  const savedBoss = mapBoss(data as Record<string, unknown>);
+  const steps = draft.steps
+    .map((step, index) => ({
+      boss_id: savedBoss.id,
+      sort_order: index,
+      name: step.name.trim(),
+      image_url: step.image_url,
+      location: step.location,
+      mechanics: step.mechanics
+    }))
+    .filter((step) => step.name);
+
+  const { error: deleteStepsError } = await supabase.from("boss_steps").delete().eq("boss_id", savedBoss.id);
+  if (deleteStepsError) {
+    throw deleteStepsError;
+  }
+
+  if (steps.length > 0) {
+    const { error: insertStepsError } = await supabase.from("boss_steps").insert(steps);
+    if (insertStepsError) {
+      throw insertStepsError;
+    }
+  }
+
+  return {
+    ...savedBoss,
+    steps: steps.map((step, index) => ({
+      id: createId("step"),
+      boss_id: savedBoss.id,
+      sort_order: index,
+      name: step.name,
+      image_url: step.image_url,
+      location: step.location,
+      mechanics: step.mechanics
+    }))
+  };
 }
 
 export async function deactivateBoss(id: string) {
@@ -432,7 +500,7 @@ export async function listUserCheckins(userId: string) {
 
   const { data, error } = await supabase
     .from("boss_checkins")
-    .select("*, boss:bosses(*)")
+    .select("*, boss:bosses(*, steps:boss_steps(*))")
     .eq("user_id", userId)
     .order("cooldown_ends_at", { ascending: false })
     .limit(100);

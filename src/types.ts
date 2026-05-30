@@ -33,10 +33,14 @@ export interface BossRecord {
   damage_types: string[];
   mechanics: string;
   access_notes: string;
+  requires_access: boolean;
+  access_url: string;
+  location: string;
   recommended_equipment: string;
   cooldown_minutes: number;
   youtube_url: string;
   is_active: boolean;
+  steps: BossStep[];
   created_at: string;
   updated_at: string;
 }
@@ -44,6 +48,18 @@ export interface BossRecord {
 export type BossDraft = Omit<BossRecord, "id" | "created_at" | "updated_at"> & {
   id?: string;
 };
+
+export interface BossStep {
+  id: string;
+  boss_id?: string;
+  sort_order: number;
+  name: string;
+  image_url: string;
+  location: string;
+  mechanics: string;
+  created_at?: string;
+  updated_at?: string;
+}
 
 export interface BossCheckin {
   id: string;

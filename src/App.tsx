@@ -10,8 +10,11 @@ import {
   Dumbbell,
   ExternalLink,
   Gavel,
+  Link2,
   LogIn,
   LogOut,
+  ListChecks,
+  MapPin,
   MessageCircle,
   Moon,
   Pencil,
@@ -82,10 +85,14 @@ const emptyBossDraft: BossDraft = {
   damage_types: [],
   mechanics: "",
   access_notes: "",
+  requires_access: false,
+  access_url: "",
+  location: "",
   recommended_equipment: "",
   cooldown_minutes: 20 * 60,
   youtube_url: "",
-  is_active: true
+  is_active: true,
+  steps: []
 };
 
 type SidebarItem = {
@@ -864,7 +871,11 @@ function BestiaryPanel({
   const filtered = useMemo(() => {
     return bosses.filter((boss) => {
       const matchesType = type === "all" || boss.type === type;
-      const text = `${boss.name} ${boss.weaknesses.join(" ")} ${boss.damage_types.join(" ")}`.toLowerCase();
+      const stepText = boss.steps
+        .map((step) => `${step.name} ${step.location} ${step.mechanics}`)
+        .join(" ");
+      const text =
+        `${boss.name} ${boss.location} ${boss.access_notes} ${boss.weaknesses.join(" ")} ${boss.damage_types.join(" ")} ${stepText}`.toLowerCase();
       return matchesType && text.includes(query.toLowerCase());
     });
   }, [bosses, query, type]);
@@ -922,11 +933,37 @@ function BossCard({
   userSignedIn: boolean;
   onCheckIn: (boss: BossRecord) => void;
 }) {
+  const [checkedSteps, setCheckedSteps] = useState<Record<string, boolean>>({});
+  const completedSteps = boss.steps.filter((step) => checkedSteps[step.id]).length;
+  const allStepsDone = boss.steps.length > 0 && completedSteps === boss.steps.length;
+
+  useEffect(() => {
+    setCheckedSteps({});
+  }, [boss.id]);
+
+  function toggleStep(stepId: string) {
+    setCheckedSteps((current) => ({ ...current, [stepId]: !current[stepId] }));
+  }
+
+  function markAllSteps() {
+    if (allStepsDone) {
+      setCheckedSteps({});
+      return;
+    }
+
+    setCheckedSteps(
+      boss.steps.reduce<Record<string, boolean>>((items, step) => {
+        items[step.id] = true;
+        return items;
+      }, {})
+    );
+  }
+
   return (
     <article className="panel overflow-hidden rounded-lg">
       <img
         alt={boss.name}
-        className="h-48 w-full object-cover"
+        className="h-52 w-full object-cover"
         src={boss.image_url || HERO_IMAGE}
       />
       <div className="space-y-4 p-4">
@@ -942,35 +979,133 @@ function BossCard({
           </span>
         </div>
 
-        <div className="grid grid-cols-2 gap-2 text-sm">
+        <div className="grid grid-cols-2 gap-2 text-sm md:grid-cols-3">
           <Metric label="HP" value={boss.hp.toLocaleString("pt-BR")} compact />
           <Metric label="Mana" value={boss.mana.toLocaleString("pt-BR")} compact />
+          <Metric label="Cooldown" value={formatDuration(boss.cooldown_minutes)} compact />
+        </div>
+
+        <div className="grid gap-2">
+          <InfoPill icon={MapPin} title="Localizacao" value={boss.location || "Localizacao a definir"} />
+          <div className="rounded-lg border border-ink/10 bg-white/70 p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.12em] text-ink/50">
+                <Link2 className="h-4 w-4 text-ember" />
+                Acesso RubinOT
+              </p>
+              {boss.requires_access && boss.access_url ? (
+                <a
+                  className="btn-secondary min-h-8 px-3 py-1.5 text-xs"
+                  href={boss.access_url}
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  Ver acesso
+                </a>
+              ) : null}
+            </div>
+            <p className="mt-2 text-sm font-bold text-ink">
+              {boss.requires_access ? "Precisa de acesso" : "Nao precisa"}
+            </p>
+            {boss.access_notes ? (
+              <p className="mt-1 text-sm leading-6 text-ink/70">{boss.access_notes}</p>
+            ) : null}
+          </div>
         </div>
 
         <TagGroup label="Fraquezas" tags={boss.weaknesses} />
         <TagGroup label="Danos" tags={boss.damage_types} />
 
-        <InfoBlock title="Mecânicas" value={boss.mechanics} />
-        <InfoBlock title="Acesso" value={boss.access_notes} />
+        <InfoBlock title="Resumo da mecanica" value={boss.mechanics} />
         <InfoBlock title="Equipamentos" value={boss.recommended_equipment} />
+
+        {boss.steps.length > 0 ? (
+          <div className="rounded-lg border border-ink/10 bg-white/70 p-3">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <p className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.12em] text-ink/50">
+                <ListChecks className="h-4 w-4 text-ember" />
+                Checklist {completedSteps}/{boss.steps.length}
+              </p>
+              <button className="btn-secondary min-h-8 px-3 py-1.5 text-xs" onClick={markAllSteps} type="button">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                {allStepsDone ? "Limpar" : "Marcar todos"}
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {boss.steps.map((step, index) => (
+                <div
+                  className={clsx(
+                    "grid gap-3 rounded-lg border p-3 transition md:grid-cols-[92px_1fr]",
+                    checkedSteps[step.id]
+                      ? "border-red-500/25 bg-red-50/80"
+                      : "border-ink/10 bg-white/75"
+                  )}
+                  key={step.id}
+                >
+                  <img
+                    alt={step.name}
+                    className="h-24 w-full rounded-lg object-cover md:h-[92px]"
+                    src={step.image_url || boss.image_url || HERO_IMAGE}
+                  />
+                  <div className="min-w-0">
+                    <button
+                      className="flex w-full items-start gap-3 text-left"
+                      onClick={() => toggleStep(step.id)}
+                      type="button"
+                    >
+                      <span
+                        className={clsx(
+                          "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border",
+                          checkedSteps[step.id]
+                            ? "border-red-600 bg-red-600 text-white"
+                            : "border-ink/25 bg-white text-transparent"
+                        )}
+                      >
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm font-black text-ink">
+                          {index + 1}. {step.name}
+                        </span>
+                        {step.location ? (
+                          <span className="mt-1 block text-xs font-bold uppercase tracking-[0.08em] text-ember">
+                            {step.location}
+                          </span>
+                        ) : null}
+                      </span>
+                    </button>
+                    {step.mechanics ? (
+                      <p className="mt-2 text-sm leading-6 text-ink/70">{step.mechanics}</p>
+                    ) : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
 
         <div className="flex flex-wrap gap-2">
           <button
             className="btn-primary"
             onClick={() => onCheckIn(boss)}
-            title={userSignedIn ? "Marcar check-in" : "Entrar para marcar check-in"}
+            title={userSignedIn ? "Iniciar temporizador" : "Entrar para iniciar temporizador"}
             type="button"
           >
             <CheckCircle2 className="h-4 w-4" />
-            Check-in
+            Ja fiz
           </button>
           {boss.youtube_url ? (
             <a className="btn-secondary" href={boss.youtube_url} rel="noreferrer" target="_blank">
               <Play className="h-4 w-4" />
-              Vídeo
+              Como chegar
             </a>
           ) : null}
         </div>
+        <p className="text-xs font-semibold text-ink/55">
+          O temporizador fica salvo na sua conta; WhatsApp e painel de cooldown usam o horario salvo no banco.
+        </p>
       </div>
     </article>
   );
@@ -1236,7 +1371,14 @@ function AdminPanel({
         damage_types: splitTags(damageText),
         hp: Number(draft.hp) || 0,
         mana: Number(draft.mana) || 0,
-        cooldown_minutes: Number(draft.cooldown_minutes) || 60
+        cooldown_minutes: Number(draft.cooldown_minutes) || 60,
+        steps: draft.steps
+          .map((step, index) => ({
+            ...step,
+            sort_order: index,
+            name: step.name.trim()
+          }))
+          .filter((step) => step.name)
       });
       setDraft(emptyBossDraft);
       setWeaknessText("");
@@ -1253,6 +1395,48 @@ function AdminPanel({
 
     const url = await uploadBossImage(file);
     setDraft((current) => ({ ...current, image_url: url }));
+  }
+
+  function updateStep(index: number, patch: Partial<BossDraft["steps"][number]>) {
+    setDraft((current) => ({
+      ...current,
+      steps: current.steps.map((step, itemIndex) =>
+        itemIndex === index ? { ...step, ...patch } : step
+      )
+    }));
+  }
+
+  function addStep() {
+    setDraft((current) => ({
+      ...current,
+      steps: [
+        ...current.steps,
+        {
+          id: createId("step"),
+          sort_order: current.steps.length,
+          name: "",
+          image_url: "",
+          location: "",
+          mechanics: ""
+        }
+      ]
+    }));
+  }
+
+  function removeStep(index: number) {
+    setDraft((current) => ({
+      ...current,
+      steps: current.steps.filter((_, itemIndex) => itemIndex !== index)
+    }));
+  }
+
+  async function handleStepUpload(index: number, file: File | undefined) {
+    if (!file) {
+      return;
+    }
+
+    const url = await uploadBossImage(file);
+    updateStep(index, { image_url: url });
   }
 
   return (
@@ -1351,7 +1535,37 @@ function AdminPanel({
               value={draft.youtube_url}
             />
           </Field>
+          <Field label="Localizacao">
+            <input
+              className="input"
+              onChange={(event) => setDraft((current) => ({ ...current, location: event.target.value }))}
+              value={draft.location}
+            />
+          </Field>
+          <label className="flex items-center gap-3 rounded-lg border border-ink/10 bg-white/70 px-3 py-3 text-sm font-bold text-ink">
+            <input
+              checked={draft.requires_access}
+              className="h-4 w-4 accent-ember"
+              onChange={(event) =>
+                setDraft((current) => ({ ...current, requires_access: event.target.checked }))
+              }
+              type="checkbox"
+            />
+            Precisa de acesso no RubinOT
+          </label>
         </div>
+
+        {draft.requires_access ? (
+          <Field label="Link do acesso">
+            <input
+              className="input"
+              onChange={(event) => setDraft((current) => ({ ...current, access_url: event.target.value }))}
+              placeholder="https://..."
+              type="url"
+              value={draft.access_url}
+            />
+          </Field>
+        ) : null}
 
         <Field label="Fraquezas">
           <input className="input" onChange={(event) => setWeaknessText(event.target.value)} value={weaknessText} />
@@ -1359,14 +1573,14 @@ function AdminPanel({
         <Field label="Danos">
           <input className="input" onChange={(event) => setDamageText(event.target.value)} value={damageText} />
         </Field>
-        <Field label="Mecânicas">
+        <Field label="Resumo da mecanica">
           <textarea
             className="input min-h-24"
             onChange={(event) => setDraft((current) => ({ ...current, mechanics: event.target.value }))}
             value={draft.mechanics}
           />
         </Field>
-        <Field label="Acesso">
+        <Field label="Observacao de acesso">
           <textarea
             className="input min-h-20"
             onChange={(event) => setDraft((current) => ({ ...current, access_notes: event.target.value }))}
@@ -1382,6 +1596,102 @@ function AdminPanel({
             value={draft.recommended_equipment}
           />
         </Field>
+
+        <div className="rounded-lg border border-ink/10 bg-white/70 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-sm font-black text-ink">Etapas/checklist</p>
+              <p className="text-xs font-semibold text-ink/55">
+                Use para GT, bosses em sequencia ou mini bosses dentro do mesmo tracker.
+              </p>
+            </div>
+            <button className="btn-secondary min-h-9 px-3 py-1.5 text-xs" onClick={addStep} type="button">
+              <Plus className="h-3.5 w-3.5" />
+              Adicionar etapa
+            </button>
+          </div>
+
+          {draft.steps.length > 0 ? (
+            <div className="mt-4 space-y-4">
+              {draft.steps.map((step, index) => (
+                <div className="rounded-lg border border-ink/10 bg-white p-3" key={step.id}>
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <p className="text-xs font-black uppercase tracking-[0.12em] text-ink/50">
+                      Etapa {index + 1}
+                    </p>
+                    <button
+                      className="icon-button"
+                      onClick={() => removeStep(index)}
+                      title="Remover etapa"
+                      type="button"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+
+                  <div className="grid gap-3 md:grid-cols-[96px_1fr]">
+                    <img
+                      alt={step.name || `Etapa ${index + 1}`}
+                      className="h-24 w-full rounded-lg object-cover md:h-full"
+                      src={step.image_url || draft.image_url || HERO_IMAGE}
+                    />
+                    <div className="grid gap-3">
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <Field label="Nome da etapa">
+                          <input
+                            className="input"
+                            onChange={(event) => updateStep(index, { name: event.target.value })}
+                            placeholder="GT 1, GT 2, Last GT..."
+                            value={step.name}
+                          />
+                        </Field>
+                        <Field label="Localizacao da etapa">
+                          <input
+                            className="input"
+                            onChange={(event) => updateStep(index, { location: event.target.value })}
+                            value={step.location}
+                          />
+                        </Field>
+                      </div>
+                      <Field label="Resumo/mecanica da etapa">
+                        <textarea
+                          className="input min-h-20"
+                          onChange={(event) => updateStep(index, { mechanics: event.target.value })}
+                          value={step.mechanics}
+                        />
+                      </Field>
+                      <div className="flex flex-wrap gap-2">
+                        <label className="btn-secondary inline-flex cursor-pointer">
+                          <Upload className="h-4 w-4" />
+                          Foto da etapa
+                          <input
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(event) => handleStepUpload(index, event.target.files?.[0])}
+                            type="file"
+                          />
+                        </label>
+                        <Field label="URL da imagem">
+                          <input
+                            className="input"
+                            onChange={(event) => updateStep(index, { image_url: event.target.value })}
+                            placeholder="Opcional"
+                            value={step.image_url}
+                          />
+                        </Field>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-4 rounded-lg border border-dashed border-ink/15 bg-white/60 px-3 py-3 text-sm font-semibold text-ink/60">
+              Sem etapas ainda. Para GT, adicione 5 bosses e uma etapa "Last GT"; no card o player marca cada uma ou todas de vez.
+            </p>
+          )}
+        </div>
+
         <label className="flex items-center gap-3 rounded-lg border border-ink/10 bg-white/70 px-3 py-3 text-sm font-bold text-ink">
           <input
             checked={draft.is_active}
@@ -1414,6 +1724,10 @@ function AdminPanel({
                 <p className="truncate font-black text-ink">{boss.name}</p>
                 <p className="text-sm text-ink/65">
                   {boss.type === "boss" ? "Boss" : "Mini boss"} · {formatDuration(boss.cooldown_minutes)}
+                </p>
+                <p className="truncate text-xs text-ink/55">
+                  {boss.location || "Sem localizacao"} · {boss.requires_access ? "Com acesso" : "Sem acesso"}
+                  {boss.steps.length ? ` · ${boss.steps.length} etapas` : ""}
                 </p>
                 <p className="text-xs font-bold uppercase tracking-[0.12em] text-ember">
                   {boss.is_active ? "Ativo" : "Inativo"}
@@ -1482,6 +1796,26 @@ function TagGroup({ label, tags }: { label: string; tags: string[] }) {
           </span>
         ))}
       </div>
+    </div>
+  );
+}
+
+function InfoPill({
+  icon: Icon,
+  title,
+  value
+}: {
+  icon: typeof Activity;
+  title: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-lg border border-ink/10 bg-white/70 p-3">
+      <p className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.12em] text-ink/50">
+        <Icon className="h-4 w-4 text-ember" />
+        {title}
+      </p>
+      <p className="mt-1 text-sm leading-6 text-ink/75">{value}</p>
     </div>
   );
 }
